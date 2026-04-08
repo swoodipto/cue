@@ -257,25 +257,35 @@ function render() {
     paintBlurredBackground(ctx, img, cW, cH, state.settings.blurAmount);
   }
 
-  // 3 — Shadow (fill a rounded rect to cast shadow beneath the image)
+  // 3 — Composite image + shadow in one pass via an offscreen canvas.
+  //
+  //     Why offscreen?  ctx.clip() also clips the shadow, so an external
+  //     shadow drawn with clip active is silently discarded.  By rendering
+  //     the corner-clipped image into a small offscreen first and then
+  //     stamping *that* onto the main canvas with the shadow, the shadow
+  //     extends freely outside the rounded rect while the image itself
+  //     stays cleanly clipped.
+  //
+  //     Why no white fill?  The offscreen is transparent where the source
+  //     image is transparent, so the shadow follows the actual visible
+  //     content.  Transparent PNGs no longer show a white bounding box.
+  const imgOff = document.createElement("canvas");
+  imgOff.width  = dW;
+  imgOff.height = dH;
+  const imgOc  = imgOff.getContext("2d");
+  tracedRoundRect(imgOc, 0, 0, dW, dH, r);
+  imgOc.clip();
+  imgOc.drawImage(img, 0, 0, dW, dH);
+
   const shadow = computeShadow(state.settings.shadow);
+  ctx.save();
   if (shadow) {
-    ctx.save();
     ctx.shadowColor   = shadow.color;
     ctx.shadowBlur    = shadow.blur;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = shadow.offsetY;
-    tracedRoundRect(ctx, ix, iy, dW, dH, r);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.restore();
   }
-
-  // 4 — Image clipped to a rounded rect
-  ctx.save();
-  tracedRoundRect(ctx, ix, iy, dW, dH, r);
-  ctx.clip();
-  ctx.drawImage(img, ix, iy, dW, dH);
+  ctx.drawImage(imgOff, ix, iy, dW, dH);
   ctx.restore();
 
   ctx.restore();
