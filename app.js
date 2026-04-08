@@ -12,7 +12,8 @@ const state = {
   imageDataURL: null, // compressed data URL persisted to localStorage
   settings: {
     bgColor:     "#ffffff", // solid background colour
-    pattern:     "none",    // "none" | "noise" | "dots"
+    pattern:     "none",    // "none" | "noise" | "dots" | "blur"
+    blurAmount:  20,        // px — 4–80 (used when pattern === "blur")
     canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
     padding:     60,        // px — 0–120
     radius:      18,        // px — 0–60
@@ -106,6 +107,46 @@ function paintDotGrid(ctx, w, h, dotColor) {
   ctx.fill();
 }
 
+/**
+ * Blurred image background: draws the source image scaled to cover the
+ * entire canvas, blurred, on an oversized offscreen canvas so the Gaussian
+ * kernel never bleeds to transparency at the edges.
+ */
+function paintBlurredBackground(ctx, img, cW, cH, blurPx) {
+  const pad = Math.ceil(blurPx * 3); // enough margin so edge-fade is invisible
+
+  // 1 — Draw the image (cover-scaled) onto a padded offscreen canvas
+  const off = document.createElement("canvas");
+  off.width  = cW + pad * 2;
+  off.height = cH + pad * 2;
+  const oc = off.getContext("2d");
+
+  const imgAspect = img.naturalWidth / img.naturalHeight;
+  const offAspect = off.width / off.height;
+  let dW, dH;
+  if (imgAspect > offAspect) {
+    dH = off.height;
+    dW = dH * imgAspect;
+  } else {
+    dW = off.width;
+    dH = dW / imgAspect;
+  }
+  oc.drawImage(img, (off.width - dW) / 2, (off.height - dH) / 2, dW, dH);
+
+  // 2 — Blur onto a second offscreen (filter on drawImage blurs the source pixels)
+  const blurred = document.createElement("canvas");
+  blurred.width  = off.width;
+  blurred.height = off.height;
+  const bc = blurred.getContext("2d");
+  bc.filter = `blur(${blurPx}px)`;
+  bc.drawImage(off, 0, 0);
+  bc.filter = "none";
+
+  // 3 — Stamp only the centre (non-faded) region onto the main canvas.
+  //     ctx is inside scale(SCALE,SCALE) so the 1× source is upscaled correctly.
+  ctx.drawImage(blurred, pad, pad, cW, cH, 0, 0, cW, cH);
+}
+
 /* ── DOM refs ───────────────────────────────────────────────── */
 
 const $ = (id) => document.getElementById(id);
@@ -128,6 +169,9 @@ const els = {
   ratioPicker:   $("ratioPicker"),
   bgColorInput:  $("bgColorInput"),
   patternPicker: $("patternPicker"),
+  blurControl:   $("blurControl"),
+  blurSlider:    $("blurSlider"),
+  blurVal:       $("blurVal"),
   paddingSlider: $("paddingSlider"),
   paddingVal:    $("paddingVal"),
   radiusSlider:  $("radiusSlider"),
@@ -203,12 +247,14 @@ function render() {
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, cW, cH);
 
-  // 2 — Optional texture pattern (colour adapts to background)
+  // 2 — Optional texture / background pattern
   const { pattern } = state.settings;
   if (pattern === "noise") {
     paintNoise(ctx, cW, cH);
   } else if (pattern === "dots") {
     paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor));
+  } else if (pattern === "blur") {
+    paintBlurredBackground(ctx, img, cW, cH, state.settings.blurAmount);
   }
 
   // 3 — Shadow (fill a rounded rect to cast shadow beneath the image)
@@ -480,16 +526,20 @@ function initControls() {
     saveSession();
   });
 
-  // Pattern picker (none / noise / dots)
+  // Pattern picker (none / noise / dots / blur)
   els.patternPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-pattern]");
     if (!chip) return;
     els.patternPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.pattern = chip.dataset.pattern;
+    els.blurControl.classList.toggle("hidden", chip.dataset.pattern !== "blur");
     render();
     saveSession();
   });
+
+  // Blur amount slider (only visible when pattern === "blur")
+  connectSlider(els.blurSlider, els.blurVal, "blurAmount", 4, 80);
 
   // Sliders + number inputs
   connectSlider(els.paddingSlider, els.paddingVal, "padding", 0, 120);
@@ -502,12 +552,18 @@ function initControls() {
 
 /** Push saved settings back into every UI control after session restore. */
 function applySettingsToUI() {
-  const { bgColor, pattern, canvasRatio, padding, radius, shadow } = state.settings;
+  const { bgColor, pattern, canvasRatio, padding, radius, shadow, blurAmount } = state.settings;
 
   els.bgColorInput.value = bgColor;
 
   syncChipPicker(els.ratioPicker,   "ratio",   canvasRatio);
   syncChipPicker(els.patternPicker, "pattern", pattern);
+
+  // Show blur slider only when blur pattern is active
+  els.blurControl.classList.toggle("hidden", pattern !== "blur");
+  els.blurSlider.value = blurAmount;
+  els.blurVal.value    = blurAmount;
+  refreshSlider(els.blurSlider);
 
   els.paddingSlider.value = padding;
   els.paddingVal.value    = padding;
@@ -565,7 +621,7 @@ function showToast(msg) {
 
 /* ── Session persistence ────────────────────────────────────── */
 
-const SESSION_KEY = "cue_v4";
+const SESSION_KEY = "cue_v5";
 
 function saveSession() {
   try {

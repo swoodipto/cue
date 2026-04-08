@@ -93,7 +93,36 @@
                             <button class="chip active" data-pattern="none">None</button>
                             <button class="chip" data-pattern="noise">Noise</button>
                             <button class="chip" data-pattern="dots">Dots</button>
+                            <button class="chip" data-pattern="blur">Blur</button>
                         </div>
+                    </div>
+
+                    <!-- Blur amount slider (only shown when Blur pattern is active) -->
+                    <div class="control-group hidden" id="blurControl">
+                        <div class="control-row">
+                            <span class="control-label">Blur amount</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="blurVal"
+                                    value="20"
+                                    min="4"
+                                    max="80"
+                                    step="2"
+                                />
+                                <span class="control-unit">px</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="blurSlider"
+                            min="4"
+                            max="80"
+                            value="20"
+                            step="2"
+                        />
                     </div>
 
                     <!-- Padding slider -->
