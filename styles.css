@@ -430,6 +430,42 @@ button {
 
 /* ── Controls ───────────────────────────────────────────────── */
 
+/* Chip row container */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Individual chip button — rectangular rounded, not pill-shaped */
+.chip {
+    padding: 7px 14px;
+    border-radius: 10px;
+    background: #f7f7f7;
+    border: 1px solid #e2e2e2;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 400;
+    font-family: var(--font);
+    white-space: nowrap;
+    line-height: 1;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.chip:hover {
+    background: #efefef;
+    color: var(--color-text);
+    border-color: #d0d0d0;
+}
+
+.chip.active {
+    background: #ffffff;
+    color: var(--color-text);
+    border-color: #c0c0c0;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
 .control-group {
     display: flex;
     flex-direction: column;
@@ -449,12 +485,47 @@ button {
     color: var(--color-text);
 }
 
-/* Numeric value readout (e.g. "60px") */
-.control-val {
-    font-size: 12px;
-    color: var(--color-text-faint);
-    font-family: var(--font-mono);
+/* Numeric value readout — styled as a borderless number input */
+.val-group {
+    display: flex;
+    align-items: center;
+    gap: 1px;
     flex-shrink: 0;
+}
+
+.control-val {
+    width: 36px;
+    text-align: right;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0;
+    /* Hide native number spinner arrows */
+    -moz-appearance: textfield;
+}
+
+.control-val::-webkit-outer-spin-button,
+.control-val::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.control-val:hover {
+    color: var(--color-text);
+    cursor: text;
+}
+
+.control-val:focus {
+    color: var(--color-text);
+}
+
+.control-unit {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
 }
 
 /* ── Slider ─────────────────────────────────────────────────── */
@@ -664,9 +735,9 @@ button {
         padding: 18px 16px;
     }
 
-    /* Chips slightly larger touch targets on mobile */
+    /* Chips — slightly more padding for touch targets */
     .chip {
-        padding: 7px 13px;
+        padding: 9px 15px;
     }
 
     .export-btn {

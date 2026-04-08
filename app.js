@@ -1,6 +1,6 @@
 /* ============================================================
    CUE — app.js
-   State · Canvas · Upload · URL load · Clipboard · Controls · Export · Session
+   State · Canvas · Upload · URL · Clipboard · Controls · Export · Session
    ============================================================ */
 
 "use strict";
@@ -11,14 +11,26 @@ const state = {
   image: null,        // HTMLImageElement currently displayed
   imageDataURL: null, // compressed data URL persisted to localStorage
   settings: {
-    bgColor: "#ffffff", // solid background colour
-    padding: 60,        // px — range 0–120
-    radius:  18,        // px — range 0–60
-    shadow:  40,        // 0–100 intensity
+    bgColor:     "#ffffff", // solid background colour
+    noise:       false,     // subtle grain overlay
+    canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
+    padding:     60,        // px — 0–120
+    radius:      18,        // px — 0–60
+    shadow:      40,        // 0–100 intensity
   },
 };
 
-/* ── Shadow computation ─────────────────────────────────────── */
+/* ── Canvas size presets ────────────────────────────────────── */
+
+// Logical pixel dimensions for the canvas at 1× (exported at 2×)
+const CANVAS_PRESETS = {
+  "16:9": { cW: 640, cH: 360  },
+  "1:1":  { cW: 560, cH: 560  },
+  "9:16": { cW: 338, cH: 600  },
+  "3:4":  { cW: 450, cH: 600  },
+};
+
+/* ── Shadow ─────────────────────────────────────────────────── */
 
 function computeShadow(intensity) {
   if (intensity <= 0) return null;
@@ -28,6 +40,19 @@ function computeShadow(intensity) {
     blur:    t * 72,
     offsetY: t * 30,
   };
+}
+
+/* ── Noise ──────────────────────────────────────────────────── */
+
+function paintNoise(ctx, w, h) {
+  const imageData = ctx.createImageData(w, h);
+  const buf = imageData.data;
+  for (let i = 0; i < buf.length; i += 4) {
+    const v = Math.random() * 255;
+    buf[i] = buf[i + 1] = buf[i + 2] = v;
+    buf[i + 3] = 28; // ~11% opacity — subtle grain
+  }
+  ctx.putImageData(imageData, 0, 0);
 }
 
 /* ── DOM refs ───────────────────────────────────────────────── */
@@ -50,7 +75,9 @@ const els = {
   sectionStyle:  $("section-style"),
   sectionExport: $("section-export"),
   // Appearance controls
+  ratioPicker:   $("ratioPicker"),
   bgColorInput:  $("bgColorInput"),
+  noisePicker:   $("noisePicker"),
   paddingSlider: $("paddingSlider"),
   paddingVal:    $("paddingVal"),
   radiusSlider:  $("radiusSlider"),
@@ -63,7 +90,7 @@ const ctx = els.canvas.getContext("2d");
 
 /* ── Canvas render ──────────────────────────────────────────── */
 
-const SCALE = 2; // 2× backing store for retina-sharp export
+const SCALE = 2; // 2× backing store → retina-sharp export
 
 function render() {
   if (!state.image) return;
@@ -77,30 +104,55 @@ function render() {
   const imgH   = img.naturalHeight;
   const aspect = imgW / imgH;
 
-  // Cap display size to keep the preview reasonable
-  const maxW = 700;
-  const maxH = 580;
+  let cW, cH, dW, dH, ix, iy;
 
-  let dW = imgW;
-  let dH = imgH;
+  const preset = CANVAS_PRESETS[state.settings.canvasRatio];
 
-  if (dW > maxW - pad * 2) { dW = maxW - pad * 2; dH = dW / aspect; }
-  if (dH > maxH - pad * 2) { dH = maxH - pad * 2; dW = dH * aspect; }
+  if (!preset) {
+    // ── Free: canvas sized to image + padding ──────────────
+    const maxW = 700;
+    const maxH = 580;
 
-  dW = Math.max(1, Math.round(dW));
-  dH = Math.max(1, Math.round(dH));
+    dW = imgW;
+    dH = imgH;
+    if (dW > maxW - pad * 2) { dW = maxW - pad * 2; dH = dW / aspect; }
+    if (dH > maxH - pad * 2) { dH = maxH - pad * 2; dW = dH * aspect; }
 
-  const cW = dW + pad * 2;
-  const cH = dH + pad * 2;
+    dW = Math.max(1, Math.round(dW));
+    dH = Math.max(1, Math.round(dH));
 
-  // Set the pixel buffer at 2×
+    cW = dW + pad * 2;
+    cH = dH + pad * 2;
+    ix = pad;
+    iy = pad;
+  } else {
+    // ── Preset ratio: fixed canvas, image centered ─────────
+    cW = preset.cW;
+    cH = preset.cH;
+
+    const availW = Math.max(1, cW - pad * 2);
+    const availH = Math.max(1, cH - pad * 2);
+
+    if (aspect > availW / availH) {
+      dW = availW;
+      dH = Math.max(1, Math.round(availW / aspect));
+    } else {
+      dH = availH;
+      dW = Math.max(1, Math.round(availH * aspect));
+    }
+
+    // Center image in canvas
+    ix = Math.round((cW - dW) / 2);
+    iy = Math.round((cH - dH) / 2);
+  }
+
+  // Size the pixel buffer at 2×
   els.canvas.width  = cW * SCALE;
   els.canvas.height = cH * SCALE;
 
-  // Set only the CSS width — let CSS height:auto maintain aspect ratio
-  // so the canvas scales correctly as the container resizes (no stretching).
+  // Only set CSS width — height:auto prevents stretching on container resize
   els.canvas.style.width  = cW + "px";
-  els.canvas.style.height = ""; // clear any previously set inline height
+  els.canvas.style.height = "";
 
   ctx.save();
   ctx.scale(SCALE, SCALE);
@@ -109,7 +161,12 @@ function render() {
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, cW, cH);
 
-  // 2 — Shadow (draw a filled rounded rect to cast the shadow beneath the image)
+  // 2 — Noise overlay (optional)
+  if (state.settings.noise) {
+    paintNoise(ctx, cW, cH);
+  }
+
+  // 3 — Shadow (fill a rounded rect to cast shadow beneath the image)
   const shadow = computeShadow(state.settings.shadow);
   if (shadow) {
     ctx.save();
@@ -117,33 +174,34 @@ function render() {
     ctx.shadowBlur    = shadow.blur;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = shadow.offsetY;
-    tracedRoundRect(ctx, pad, pad, dW, dH, r);
+    tracedRoundRect(ctx, ix, iy, dW, dH, r);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.restore();
   }
 
-  // 3 — Image clipped to a rounded rect
+  // 4 — Image clipped to a rounded rect
   ctx.save();
-  tracedRoundRect(ctx, pad, pad, dW, dH, r);
+  tracedRoundRect(ctx, ix, iy, dW, dH, r);
   ctx.clip();
-  ctx.drawImage(img, pad, pad, dW, dH);
+  ctx.drawImage(img, ix, iy, dW, dH);
   ctx.restore();
 
   ctx.restore();
 }
 
 function tracedRoundRect(ctx, x, y, w, h, r) {
+  const safe = Math.min(r, w / 2, h / 2); // clamp so it never exceeds half side
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h,     x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y,         x + r, y);
+  ctx.moveTo(x + safe, y);
+  ctx.lineTo(x + w - safe, y);
+  ctx.quadraticCurveTo(x + w, y,     x + w, y + safe);
+  ctx.lineTo(x + w, y + h - safe);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - safe, y + h);
+  ctx.lineTo(x + safe, y + h);
+  ctx.quadraticCurveTo(x, y + h,     x, y + h - safe);
+  ctx.lineTo(x, y + safe);
+  ctx.quadraticCurveTo(x, y,         x + safe, y);
   ctx.closePath();
 }
 
@@ -160,8 +218,9 @@ function loadImgElement(src, crossOrigin = null) {
 }
 
 /**
- * Compress an HTMLImageElement to a data URL small enough for localStorage.
- * Caps the longest dimension at 1 200 px and prefers JPEG for large images.
+ * Compress an HTMLImageElement down to a data URL that fits in localStorage.
+ * Caps the longest dimension at 1 200 px; falls back from PNG to JPEG for
+ * large images to stay under the ~5 MB localStorage quota.
  */
 function toStorageURL(img) {
   const MAX = 1200;
@@ -174,15 +233,14 @@ function toStorageURL(img) {
     h = Math.round(h * ratio);
   }
 
-  const offscreen = document.createElement("canvas");
-  offscreen.width  = w;
-  offscreen.height = h;
-  offscreen.getContext("2d").drawImage(img, 0, 0, w, h);
+  const off = document.createElement("canvas");
+  off.width  = w;
+  off.height = h;
+  off.getContext("2d").drawImage(img, 0, 0, w, h);
 
-  // PNG preserves transparency; only fall back to JPEG when the PNG is large
-  const png = offscreen.toDataURL("image/png");
-  if (png.length <= 600_000) return png;
-  return offscreen.toDataURL("image/jpeg", 0.88);
+  const png = off.toDataURL("image/png");
+  if (png.length <= 600_000) return png;          // ≤ ~450 KB encoded — use PNG
+  return off.toDataURL("image/jpeg", 0.88);       // fall back to JPEG
 }
 
 async function setImage(dataURL) {
@@ -191,7 +249,7 @@ async function setImage(dataURL) {
     state.image = img;
     showPreview();
     render();
-    // Compress before storing so large file-uploads don't exceed localStorage quota
+    // Compress before storing so large uploads don't silently exceed quota
     state.imageDataURL = toStorageURL(img);
     saveSession();
   } catch {
@@ -225,15 +283,15 @@ async function loadFromURL(raw) {
   setHint("Loading…", false);
 
   try {
-    // Load with crossOrigin so we can call toDataURL() without tainting the canvas
+    // crossOrigin = anonymous so we can call toDataURL() without tainting the canvas
     const img = await loadImgElement(url, "anonymous");
 
     // Rasterise to a data URL for persistence
-    const offscreen   = document.createElement("canvas");
-    offscreen.width   = img.naturalWidth;
-    offscreen.height  = img.naturalHeight;
-    offscreen.getContext("2d").drawImage(img, 0, 0);
-    const dataURL = offscreen.toDataURL("image/png");
+    const off = document.createElement("canvas");
+    off.width  = img.naturalWidth;
+    off.height = img.naturalHeight;
+    off.getContext("2d").drawImage(img, 0, 0);
+    const dataURL = off.toDataURL("image/png");
 
     await setImage(dataURL);
     setHint("");
@@ -253,11 +311,9 @@ function showPreview() {
   els.sectionStyle.classList.remove("hidden");
   els.sectionExport.classList.remove("hidden");
 
-  // Re-trigger entrance animation on each new image
+  // Re-trigger entrance animation on each new image load
   els.frameWrap.style.animation = "none";
-  requestAnimationFrame(() => {
-    els.frameWrap.style.animation = "";
-  });
+  requestAnimationFrame(() => { els.frameWrap.style.animation = ""; });
 }
 
 /* ── Upload zone ────────────────────────────────────────────── */
@@ -275,10 +331,9 @@ function initUpload() {
 
   els.fileInput.addEventListener("change", (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);
-    els.fileInput.value = "";
+    els.fileInput.value = ""; // reset so same file can be re-selected
   });
 
-  // Drag over upload zone
   els.uploadZone.addEventListener("dragover", (e) => {
     e.preventDefault();
     els.uploadZone.classList.add("drag-over");
@@ -327,7 +382,7 @@ function setHint(text, isError = false) {
 
 function initClipboard() {
   document.addEventListener("paste", (e) => {
-    // Let the browser handle paste when the user is typing in the URL field
+    // Let the browser handle paste when typing in the URL field
     if (document.activeElement === els.urlInput) return;
 
     const items = Array.from(e.clipboardData.items);
@@ -340,7 +395,7 @@ function initClipboard() {
       return;
     }
 
-    // Priority 2: plain text that looks like a URL
+    // Priority 2: plain text that looks like an image URL
     const textItem = items.find((it) => it.type === "text/plain");
     if (textItem) {
       textItem.getAsString((text) => {
@@ -357,10 +412,7 @@ function initClipboard() {
 
 /* ── Slider helpers ─────────────────────────────────────────── */
 
-/**
- * Update the gradient fill on a range slider's track.
- * The CSS uses --pct to split the filled / unfilled portions.
- */
+/** Update the CSS --pct variable so the track fill matches the thumb position. */
 function refreshSlider(slider) {
   const min = parseFloat(slider.min);
   const max = parseFloat(slider.max);
@@ -369,64 +421,93 @@ function refreshSlider(slider) {
   slider.style.setProperty("--pct", pct.toFixed(1) + "%");
 }
 
+/**
+ * Wire a range slider and a number <input> together.
+ * Either control updates state.settings[key], re-renders, and saves.
+ */
+function connectSlider(slider, numInput, key, min, max) {
+  const apply = (raw) => {
+    const val = Math.min(max, Math.max(min, Math.round(+raw)));
+    if (!Number.isFinite(val)) return;
+    state.settings[key] = val;
+    slider.value         = val;
+    numInput.value       = val;
+    refreshSlider(slider);
+    render();
+    saveSession();
+  };
+
+  slider.addEventListener("input",   () => apply(slider.value));
+  numInput.addEventListener("change", () => apply(numInput.value));
+  numInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") numInput.blur();
+  });
+}
+
 /* ── Controls ───────────────────────────────────────────────── */
 
 function initControls() {
-  // Background colour picker
+  // Canvas ratio
+  els.ratioPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-ratio]");
+    if (!chip) return;
+    els.ratioPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.settings.canvasRatio = chip.dataset.ratio;
+    render();
+    saveSession();
+  });
+
+  // Background colour
   els.bgColorInput.addEventListener("input", () => {
     state.settings.bgColor = els.bgColorInput.value;
     render();
     saveSession();
   });
 
-  // Padding slider
-  els.paddingSlider.addEventListener("input", () => {
-    const val = parseInt(els.paddingSlider.value, 10);
-    state.settings.padding  = val;
-    els.paddingVal.textContent = val + "px";
-    refreshSlider(els.paddingSlider);
+  // Noise toggle
+  els.noisePicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-noise]");
+    if (!chip) return;
+    els.noisePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.settings.noise = chip.dataset.noise === "true";
     render();
     saveSession();
   });
 
-  // Corner radius slider
-  els.radiusSlider.addEventListener("input", () => {
-    const val = parseInt(els.radiusSlider.value, 10);
-    state.settings.radius  = val;
-    els.radiusVal.textContent = val + "px";
-    refreshSlider(els.radiusSlider);
-    render();
-    saveSession();
-  });
-
-  // Shadow slider
-  els.shadowSlider.addEventListener("input", () => {
-    const val = parseInt(els.shadowSlider.value, 10);
-    state.settings.shadow  = val;
-    els.shadowVal.textContent = val + "%";
-    refreshSlider(els.shadowSlider);
-    render();
-    saveSession();
-  });
+  // Sliders + number inputs
+  connectSlider(els.paddingSlider, els.paddingVal, "padding", 0, 120);
+  connectSlider(els.radiusSlider,  els.radiusVal,  "radius",  0,  60);
+  connectSlider(els.shadowSlider,  els.shadowVal,  "shadow",  0, 100);
 }
 
-/** Push saved settings back into the UI controls. */
+/** Push saved settings back into every UI control after session restore. */
 function applySettingsToUI() {
-  const { bgColor, padding, radius, shadow } = state.settings;
+  const { bgColor, noise, canvasRatio, padding, radius, shadow } = state.settings;
 
   els.bgColorInput.value = bgColor;
 
-  els.paddingSlider.value    = padding;
-  els.paddingVal.textContent = padding + "px";
+  syncChipPicker(els.ratioPicker, "ratio", canvasRatio);
+  syncChipPicker(els.noisePicker, "noise", String(noise));
+
+  els.paddingSlider.value = padding;
+  els.paddingVal.value    = padding;
   refreshSlider(els.paddingSlider);
 
-  els.radiusSlider.value    = radius;
-  els.radiusVal.textContent = radius + "px";
+  els.radiusSlider.value = radius;
+  els.radiusVal.value    = radius;
   refreshSlider(els.radiusSlider);
 
-  els.shadowSlider.value    = shadow;
-  els.shadowVal.textContent = shadow + "%";
+  els.shadowSlider.value = shadow;
+  els.shadowVal.value    = shadow;
   refreshSlider(els.shadowSlider);
+}
+
+function syncChipPicker(container, dataKey, value) {
+  container.querySelectorAll(`.chip[data-${dataKey}]`).forEach((c) => {
+    c.classList.toggle("active", c.dataset[dataKey] === value);
+  });
 }
 
 /* ── Export ─────────────────────────────────────────────────── */
@@ -444,9 +525,7 @@ function initExport() {
   els.copyBtn.addEventListener("click", async () => {
     if (!state.image) return;
     try {
-      const blob = await new Promise((res) =>
-        els.canvas.toBlob(res, "image/png")
-      );
+      const blob = await new Promise((res) => els.canvas.toBlob(res, "image/png"));
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       showToast("Copied to clipboard ✓");
     } catch {
@@ -468,20 +547,15 @@ function showToast(msg) {
 
 /* ── Session persistence ────────────────────────────────────── */
 
-const SESSION_KEY = "cue_v2";
+const SESSION_KEY = "cue_v3";
 
 function saveSession() {
   try {
-    localStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({
-        settings:     state.settings,
-        imageDataURL: state.imageDataURL,
-      })
-    );
-  } catch {
-    // Silently ignore quota errors — the app still works, just won't persist
-  }
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      settings:     state.settings,
+      imageDataURL: state.imageDataURL,
+    }));
+  } catch { /* quota exceeded — fail silently */ }
 }
 
 async function restoreSession() {

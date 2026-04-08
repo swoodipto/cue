@@ -96,25 +96,45 @@
                 <section class="panel-section hidden" id="section-style">
                     <p class="section-label">Appearance</p>
 
-                    <!-- Background color picker -->
-                    <div class="control-row">
-                        <span class="control-label">Background</span>
-                        <input
-                            type="color"
-                            id="bgColorInput"
-                            class="color-swatch"
-                            value="#ffffff"
-                            title="Pick background color"
-                        />
+                    <!-- Canvas size -->
+                    <div class="control-group">
+                        <span class="control-label">Canvas</span>
+                        <div class="chip-row" id="ratioPicker">
+                            <button class="chip active" data-ratio="free">Free</button>
+                            <button class="chip" data-ratio="16:9">16:9</button>
+                            <button class="chip" data-ratio="1:1">1:1</button>
+                            <button class="chip" data-ratio="9:16">9:16</button>
+                            <button class="chip" data-ratio="3:4">3:4</button>
+                        </div>
+                    </div>
+
+                    <!-- Background colour + noise -->
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Background</span>
+                            <input
+                                type="color"
+                                id="bgColorInput"
+                                class="color-swatch"
+                                value="#ffffff"
+                                title="Pick background color"
+                            />
+                        </div>
+                        <div class="chip-row" id="noisePicker">
+                            <button class="chip active" data-noise="false">No noise</button>
+                            <button class="chip" data-noise="true">Noise</button>
+                        </div>
                     </div>
 
                     <!-- Padding slider -->
                     <div class="control-group">
                         <div class="control-row">
                             <span class="control-label">Padding</span>
-                            <span class="control-val" id="paddingVal"
-                                >60px</span
-                            >
+                            <span class="val-group">
+                                <input type="number" class="control-val" id="paddingVal"
+                                    value="60" min="0" max="120" step="4" />
+                                <span class="control-unit">px</span>
+                            </span>
                         </div>
                         <input
                             type="range"
@@ -131,7 +151,11 @@
                     <div class="control-group">
                         <div class="control-row">
                             <span class="control-label">Corner Radius</span>
-                            <span class="control-val" id="radiusVal">18px</span>
+                            <span class="val-group">
+                                <input type="number" class="control-val" id="radiusVal"
+                                    value="18" min="0" max="60" step="1" />
+                                <span class="control-unit">px</span>
+                            </span>
                         </div>
                         <input
                             type="range"
@@ -148,7 +172,11 @@
                     <div class="control-group">
                         <div class="control-row">
                             <span class="control-label">Shadow</span>
-                            <span class="control-val" id="shadowVal">40%</span>
+                            <span class="val-group">
+                                <input type="number" class="control-val" id="shadowVal"
+                                    value="40" min="0" max="100" step="1" />
+                                <span class="control-unit">%</span>
+                            </span>
                         </div>
                         <input
                             type="range"
