@@ -1,152 +1,191 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cue — Present beautifully</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-
-    <!-- ── Header ──────────────────────────────────────────── -->
-    <header class="header">
-      <div class="logo">
-        <span class="logo-mark">◆</span>
-        <span class="logo-text">Cue</span>
-      </div>
-      <span class="header-tagline">Present anything, beautifully.</span>
-    </header>
-
-    <!-- ── Main layout ─────────────────────────────────────── -->
-    <main class="layout">
-
-      <!-- CENTER: Preview -->
-      <div class="preview-area" id="previewArea">
-
-        <!-- Empty state -->
-        <div class="empty-state" id="emptyState">
-          <div class="empty-graphic">
-            <div class="eg-card eg-1"></div>
-            <div class="eg-card eg-2"></div>
-            <div class="eg-card eg-3"></div>
-          </div>
-          <p class="empty-title">Your presentation appears here</p>
-          <p class="empty-sub">Upload an image, paste a URL, or press ⌘V</p>
-        </div>
-
-        <!-- Canvas frame (hidden until image loaded) -->
-        <div class="frame-wrap hidden" id="frameWrap">
-          <div class="frame">
-            <canvas id="previewCanvas"></canvas>
-          </div>
-          <p class="frame-hint">Live preview · 2× export</p>
-        </div>
-
-      </div>
-
-      <!-- RIGHT: Controls panel -->
-      <aside class="panel" id="panel">
-
-        <!-- ── Input ──────────────────────────────────────── -->
-        <section class="panel-section" id="section-input">
-          <p class="section-label">Add Image</p>
-
-          <!-- Upload zone -->
-          <div class="upload-zone" id="uploadZone">
-            <input
-              type="file"
-              id="fileInput"
-              accept="image/png,image/jpeg,image/webp"
-              hidden
-            />
-            <div class="upload-icon">↑</div>
-            <p class="upload-title">Drop image here</p>
-            <p class="upload-sub">
-              or <button class="link-btn" id="browseBtn">browse files</button>
-            </p>
-            <p class="upload-formats">PNG · JPG · WEBP · ⌘V to paste</p>
-          </div>
-
-          <div class="or-divider"><span>or</span></div>
-
-          <!-- URL input -->
-          <div class="url-input-wrap">
-            <input
-              type="url"
-              id="urlInput"
-              class="url-input"
-              placeholder="Paste image URL…"
-              spellcheck="false"
-              autocomplete="off"
-            />
-            <button class="fetch-btn" id="fetchBtn" title="Load image">→</button>
-          </div>
-          <p class="url-hint" id="urlHint"></p>
-        </section>
-
-        <!-- ── Appearance (hidden until image loaded) ─────── -->
-        <section class="panel-section hidden" id="section-style">
-          <p class="section-label">Appearance</p>
-
-          <div class="control-group">
-            <span class="control-label">Background</span>
-            <div class="chip-row" id="bgPicker">
-              <button class="chip active" data-bg="white">White</button>
-              <button class="chip" data-bg="warm">Warm</button>
-              <button class="chip" data-bg="cool">Cool</button>
-              <button class="chip" data-bg="gradient">Gradient</button>
-              <button class="chip" data-bg="dark">Dark</button>
-              <button class="chip chip-icon" id="shuffleBtn" title="Random gradient">↺</button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Cue — Present beautifully</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <!-- ── Header ──────────────────────────────────────────── -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-mark">◆</span>
+                <span class="logo-text">Cue</span>
             </div>
-          </div>
+            <span class="header-tagline">Present anything, beautifully.</span>
+        </header>
 
-          <div class="control-group">
-            <span class="control-label">Padding</span>
-            <div class="chip-row" id="paddingPicker">
-              <button class="chip" data-padding="tight">Tight</button>
-              <button class="chip active" data-padding="medium">Medium</button>
-              <button class="chip" data-padding="wide">Wide</button>
+        <!-- ── Main layout ─────────────────────────────────────── -->
+        <main class="layout">
+            <!-- CENTER: Preview -->
+            <div class="preview-area" id="previewArea">
+                <!-- Empty state -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-graphic">
+                        <div class="eg-card eg-1"></div>
+                        <div class="eg-card eg-2"></div>
+                        <div class="eg-card eg-3"></div>
+                    </div>
+                    <p class="empty-title">Your presentation appears here</p>
+                    <p class="empty-sub">
+                        Upload an image, paste a URL, or press ⌘V
+                    </p>
+                </div>
+
+                <!-- Canvas frame (hidden until image loaded) -->
+                <div class="frame-wrap hidden" id="frameWrap">
+                    <div class="frame">
+                        <canvas id="previewCanvas"></canvas>
+                    </div>
+                    <p class="frame-hint">Live preview · 2× export</p>
+                </div>
             </div>
-          </div>
 
-          <div class="control-group">
-            <span class="control-label">Corners</span>
-            <div class="chip-row" id="radiusPicker">
-              <button class="chip" data-radius="small">Small</button>
-              <button class="chip active" data-radius="medium">Medium</button>
-              <button class="chip" data-radius="large">Large</button>
-            </div>
-          </div>
+            <!-- RIGHT: Controls panel -->
+            <aside class="panel" id="panel">
+                <!-- ── Input ──────────────────────────────────────── -->
+                <section class="panel-section" id="section-input">
+                    <p class="section-label">Add Image</p>
 
-          <div class="control-group">
-            <span class="control-label">Shadow</span>
-            <div class="chip-row" id="shadowPicker">
-              <button class="chip" data-shadow="off">Off</button>
-              <button class="chip active" data-shadow="soft">Soft</button>
-              <button class="chip" data-shadow="strong">Strong</button>
-            </div>
-          </div>
-        </section>
+                    <!-- Upload zone -->
+                    <div class="upload-zone" id="uploadZone">
+                        <input
+                            type="file"
+                            id="fileInput"
+                            accept="image/png,image/jpeg,image/webp"
+                            hidden
+                        />
+                        <div class="upload-icon">↑</div>
+                        <p class="upload-title">Drop image here</p>
+                        <p class="upload-sub">
+                            or
+                            <button class="link-btn" id="browseBtn">
+                                browse files
+                            </button>
+                        </p>
+                        <p class="upload-formats">
+                            PNG · JPG · WEBP · ⌘V to paste
+                        </p>
+                    </div>
 
-        <!-- ── Export (hidden until image loaded) ─────────── -->
-        <section class="panel-section hidden" id="section-export">
-          <p class="section-label">Export</p>
-          <div class="export-row">
-            <button class="export-btn" id="exportBtn">
-              <span class="export-icon">↓</span>
-              Download PNG
-            </button>
-            <button class="copy-btn" id="copyBtn" title="Copy to clipboard">⊞</button>
-          </div>
-          <p class="export-note">2× resolution · No watermark</p>
-        </section>
+                    <div class="or-divider"><span>or</span></div>
 
-      </aside>
-    </main>
+                    <!-- URL input -->
+                    <div class="url-input-wrap">
+                        <input
+                            type="url"
+                            id="urlInput"
+                            class="url-input"
+                            placeholder="Paste image URL…"
+                            spellcheck="false"
+                            autocomplete="off"
+                        />
+                        <button
+                            class="fetch-btn"
+                            id="fetchBtn"
+                            title="Load image"
+                        >
+                            →
+                        </button>
+                    </div>
+                    <p class="url-hint" id="urlHint"></p>
+                </section>
 
-    <!-- Toast notification -->
-    <div class="toast" id="toast"></div>
+                <!-- ── Appearance (hidden until image loaded) ─────── -->
+                <section class="panel-section hidden" id="section-style">
+                    <p class="section-label">Appearance</p>
 
-    <script src="app.js"></script>
-  </body>
+                    <!-- Background color picker -->
+                    <div class="control-row">
+                        <span class="control-label">Background</span>
+                        <input
+                            type="color"
+                            id="bgColorInput"
+                            class="color-swatch"
+                            value="#ffffff"
+                            title="Pick background color"
+                        />
+                    </div>
+
+                    <!-- Padding slider -->
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Padding</span>
+                            <span class="control-val" id="paddingVal"
+                                >60px</span
+                            >
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="paddingSlider"
+                            min="0"
+                            max="120"
+                            value="60"
+                            step="4"
+                        />
+                    </div>
+
+                    <!-- Corner radius slider -->
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Corner Radius</span>
+                            <span class="control-val" id="radiusVal">18px</span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="radiusSlider"
+                            min="0"
+                            max="60"
+                            value="18"
+                            step="1"
+                        />
+                    </div>
+
+                    <!-- Shadow slider -->
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Shadow</span>
+                            <span class="control-val" id="shadowVal">40%</span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="shadowSlider"
+                            min="0"
+                            max="100"
+                            value="40"
+                            step="1"
+                        />
+                    </div>
+                </section>
+
+                <!-- ── Export (hidden until image loaded) ─────────── -->
+                <section class="panel-section hidden" id="section-export">
+                    <p class="section-label">Export</p>
+                    <div class="export-row">
+                        <button class="export-btn" id="exportBtn">
+                            <span class="export-icon">↓</span>
+                            Download PNG
+                        </button>
+                        <button
+                            class="copy-btn"
+                            id="copyBtn"
+                            title="Copy to clipboard"
+                        >
+                            ⊞
+                        </button>
+                    </div>
+                    <p class="export-note">2× resolution · No watermark</p>
+                </section>
+            </aside>
+        </main>
+
+        <!-- Toast notification -->
+        <div class="toast" id="toast"></div>
+
+        <script src="app.js"></script>
+    </body>
 </html>

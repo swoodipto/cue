@@ -8,91 +8,26 @@
 /* ── State ──────────────────────────────────────────────────── */
 
 const state = {
-  image: null,         // HTMLImageElement currently displayed
-  imageDataURL: null,  // base64 data URL for session persistence
+  image: null,        // HTMLImageElement currently displayed
+  imageDataURL: null, // compressed data URL persisted to localStorage
   settings: {
-    bg: "white",
-    padding: "medium",
-    radius: "medium",
-    shadow: "soft",
-    customGradient: null, // [colorA, colorB] set by shuffle
+    bgColor: "#ffffff", // solid background colour
+    padding: 60,        // px — range 0–120
+    radius:  18,        // px — range 0–60
+    shadow:  40,        // 0–100 intensity
   },
 };
 
-/* ── Config maps ────────────────────────────────────────────── */
+/* ── Shadow computation ─────────────────────────────────────── */
 
-const PADDING_MAP = { tight: 28, medium: 60, wide: 96 };
-const RADIUS_MAP  = { small: 8,  medium: 18, large: 32 };
-
-const SHADOW_MAP = {
-  off:    null,
-  soft:   { color: "rgba(0,0,0,0.13)", blur: 40, offsetY: 16 },
-  strong: { color: "rgba(0,0,0,0.30)", blur: 72, offsetY: 28 },
-};
-
-/* Return a function (ctx, w, h) => void that fills the background */
-function getBgPainter(settings) {
-  const { bg, customGradient } = settings;
-
-  if (bg === "custom" && customGradient) {
-    return (ctx, w, h) => {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, customGradient[0]);
-      g.addColorStop(1, customGradient[1]);
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    };
-  }
-
-  const painters = {
-    white(ctx, w, h) {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, w, h);
-    },
-    warm(ctx, w, h) {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, "#fdf6ec");
-      g.addColorStop(1, "#fce8d5");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    },
-    cool(ctx, w, h) {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, "#eef2ff");
-      g.addColorStop(1, "#dbeafe");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    },
-    gradient(ctx, w, h) {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0,   "#f0fdf4");
-      g.addColorStop(0.5, "#fdf4ff");
-      g.addColorStop(1,   "#fff7ed");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-      paintNoise(ctx, w, h, 0.025);
-    },
-    dark(ctx, w, h) {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, "#1a1a2e");
-      g.addColorStop(1, "#0f0f1a");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    },
+function computeShadow(intensity) {
+  if (intensity <= 0) return null;
+  const t = intensity / 100;
+  return {
+    color:   `rgba(0,0,0,${(t * 0.35).toFixed(3)})`,
+    blur:    t * 72,
+    offsetY: t * 30,
   };
-
-  return painters[bg] || painters.white;
-}
-
-function paintNoise(ctx, w, h, alpha) {
-  const data = ctx.createImageData(w, h);
-  const buf  = data.data;
-  for (let i = 0; i < buf.length; i += 4) {
-    const v = Math.random() * 255;
-    buf[i] = buf[i + 1] = buf[i + 2] = v;
-    buf[i + 3] = alpha * 255;
-  }
-  ctx.putImageData(data, 0, 0);
 }
 
 /* ── DOM refs ───────────────────────────────────────────────── */
@@ -114,31 +49,35 @@ const els = {
   toast:         $("toast"),
   sectionStyle:  $("section-style"),
   sectionExport: $("section-export"),
-  bgPicker:      $("bgPicker"),
-  paddingPicker: $("paddingPicker"),
-  radiusPicker:  $("radiusPicker"),
-  shadowPicker:  $("shadowPicker"),
-  shuffleBtn:    $("shuffleBtn"),
+  // Appearance controls
+  bgColorInput:  $("bgColorInput"),
+  paddingSlider: $("paddingSlider"),
+  paddingVal:    $("paddingVal"),
+  radiusSlider:  $("radiusSlider"),
+  radiusVal:     $("radiusVal"),
+  shadowSlider:  $("shadowSlider"),
+  shadowVal:     $("shadowVal"),
 };
 
 const ctx = els.canvas.getContext("2d");
 
 /* ── Canvas render ──────────────────────────────────────────── */
 
-const SCALE = 2; // export at 2× for retina sharpness
+const SCALE = 2; // 2× backing store for retina-sharp export
 
 function render() {
   if (!state.image) return;
 
-  const img  = state.image;
-  const pad  = PADDING_MAP[state.settings.padding];
-  const r    = RADIUS_MAP[state.settings.radius];
+  const img     = state.image;
+  const pad     = state.settings.padding;
+  const r       = state.settings.radius;
+  const bgColor = state.settings.bgColor;
 
   const imgW   = img.naturalWidth;
   const imgH   = img.naturalHeight;
   const aspect = imgW / imgH;
 
-  // Compute display dimensions, capped at a sensible max
+  // Cap display size to keep the preview reasonable
   const maxW = 700;
   const maxH = 580;
 
@@ -148,26 +87,30 @@ function render() {
   if (dW > maxW - pad * 2) { dW = maxW - pad * 2; dH = dW / aspect; }
   if (dH > maxH - pad * 2) { dH = maxH - pad * 2; dW = dH * aspect; }
 
-  dW = Math.round(dW);
-  dH = Math.round(dH);
+  dW = Math.max(1, Math.round(dW));
+  dH = Math.max(1, Math.round(dH));
 
   const cW = dW + pad * 2;
   const cH = dH + pad * 2;
 
-  // Size the canvas (2× backing store)
-  els.canvas.width        = cW * SCALE;
-  els.canvas.height       = cH * SCALE;
+  // Set the pixel buffer at 2×
+  els.canvas.width  = cW * SCALE;
+  els.canvas.height = cH * SCALE;
+
+  // Set only the CSS width — let CSS height:auto maintain aspect ratio
+  // so the canvas scales correctly as the container resizes (no stretching).
   els.canvas.style.width  = cW + "px";
-  els.canvas.style.height = cH + "px";
+  els.canvas.style.height = ""; // clear any previously set inline height
 
   ctx.save();
   ctx.scale(SCALE, SCALE);
 
-  // 1 — Background
-  getBgPainter(state.settings)(ctx, cW, cH);
+  // 1 — Solid background
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, cW, cH);
 
-  // 2 — Shadow (draw a filled rounded rect to cast it)
-  const shadow = SHADOW_MAP[state.settings.shadow];
+  // 2 — Shadow (draw a filled rounded rect to cast the shadow beneath the image)
+  const shadow = computeShadow(state.settings.shadow);
   if (shadow) {
     ctx.save();
     ctx.shadowColor   = shadow.color;
@@ -180,7 +123,7 @@ function render() {
     ctx.restore();
   }
 
-  // 3 — Image clipped to rounded rect
+  // 3 — Image clipped to a rounded rect
   ctx.save();
   tracedRoundRect(ctx, pad, pad, dW, dH, r);
   ctx.clip();
@@ -216,13 +159,40 @@ function loadImgElement(src, crossOrigin = null) {
   });
 }
 
+/**
+ * Compress an HTMLImageElement to a data URL small enough for localStorage.
+ * Caps the longest dimension at 1 200 px and prefers JPEG for large images.
+ */
+function toStorageURL(img) {
+  const MAX = 1200;
+  let w = img.naturalWidth;
+  let h = img.naturalHeight;
+
+  if (w > MAX || h > MAX) {
+    const ratio = Math.min(MAX / w, MAX / h);
+    w = Math.round(w * ratio);
+    h = Math.round(h * ratio);
+  }
+
+  const offscreen = document.createElement("canvas");
+  offscreen.width  = w;
+  offscreen.height = h;
+  offscreen.getContext("2d").drawImage(img, 0, 0, w, h);
+
+  // PNG preserves transparency; only fall back to JPEG when the PNG is large
+  const png = offscreen.toDataURL("image/png");
+  if (png.length <= 600_000) return png;
+  return offscreen.toDataURL("image/jpeg", 0.88);
+}
+
 async function setImage(dataURL) {
   try {
     const img = await loadImgElement(dataURL);
-    state.image       = img;
-    state.imageDataURL = dataURL;
+    state.image = img;
     showPreview();
     render();
+    // Compress before storing so large file-uploads don't exceed localStorage quota
+    state.imageDataURL = toStorageURL(img);
     saveSession();
   } catch {
     showToast("Could not display image.");
@@ -255,10 +225,10 @@ async function loadFromURL(raw) {
   setHint("Loading…", false);
 
   try {
-    // Load with crossOrigin so we can draw to canvas without tainting it
+    // Load with crossOrigin so we can call toDataURL() without tainting the canvas
     const img = await loadImgElement(url, "anonymous");
 
-    // Rasterise to data URL so it can be persisted in localStorage
+    // Rasterise to a data URL for persistence
     const offscreen   = document.createElement("canvas");
     offscreen.width   = img.naturalWidth;
     offscreen.height  = img.naturalHeight;
@@ -275,7 +245,7 @@ async function loadFromURL(raw) {
   }
 }
 
-/* ── Show / hide preview ────────────────────────────────────── */
+/* ── Show preview ───────────────────────────────────────────── */
 
 function showPreview() {
   els.emptyState.classList.add("hidden");
@@ -293,7 +263,6 @@ function showPreview() {
 /* ── Upload zone ────────────────────────────────────────────── */
 
 function initUpload() {
-  // Click zone → open picker (but not if they clicked the browse button itself)
   els.uploadZone.addEventListener("click", (e) => {
     if (e.target === els.browseBtn || e.target.closest(".link-btn")) return;
     els.fileInput.click();
@@ -306,7 +275,7 @@ function initUpload() {
 
   els.fileInput.addEventListener("change", (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);
-    els.fileInput.value = ""; // reset so same file can be re-selected
+    els.fileInput.value = "";
   });
 
   // Drag over upload zone
@@ -314,20 +283,17 @@ function initUpload() {
     e.preventDefault();
     els.uploadZone.classList.add("drag-over");
   });
-
   els.uploadZone.addEventListener("dragleave", () => {
     els.uploadZone.classList.remove("drag-over");
   });
-
   els.uploadZone.addEventListener("drop", (e) => {
     e.preventDefault();
     els.uploadZone.classList.remove("drag-over");
     handleFile(e.dataTransfer.files[0]);
   });
 
-  // Global drag-and-drop (drop anywhere on the page)
+  // Global drop anywhere on the page
   document.addEventListener("dragover", (e) => e.preventDefault());
-
   document.addEventListener("drop", (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
@@ -339,12 +305,9 @@ function initUpload() {
 
 function initURLInput() {
   els.fetchBtn.addEventListener("click", () => loadFromURL(els.urlInput.value));
-
   els.urlInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadFromURL(els.urlInput.value);
   });
-
-  // Clear hint while user is typing a new URL
   els.urlInput.addEventListener("input", () => {
     if (els.urlHint.classList.contains("error")) setHint("");
   });
@@ -364,13 +327,13 @@ function setHint(text, isError = false) {
 
 function initClipboard() {
   document.addEventListener("paste", (e) => {
-    // If the user is actively typing in the URL input, let the browser handle it
+    // Let the browser handle paste when the user is typing in the URL field
     if (document.activeElement === els.urlInput) return;
 
     const items = Array.from(e.clipboardData.items);
 
     // Priority 1: raw image data (screenshot, copied image)
-    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    const imageItem = items.find((it) => it.type.startsWith("image/"));
     if (imageItem) {
       e.preventDefault();
       handleFile(imageItem.getAsFile());
@@ -378,7 +341,7 @@ function initClipboard() {
     }
 
     // Priority 2: plain text that looks like a URL
-    const textItem = items.find((item) => item.type === "text/plain");
+    const textItem = items.find((it) => it.type === "text/plain");
     if (textItem) {
       textItem.getAsString((text) => {
         const trimmed = text.trim();
@@ -392,70 +355,78 @@ function initClipboard() {
   });
 }
 
+/* ── Slider helpers ─────────────────────────────────────────── */
+
+/**
+ * Update the gradient fill on a range slider's track.
+ * The CSS uses --pct to split the filled / unfilled portions.
+ */
+function refreshSlider(slider) {
+  const min = parseFloat(slider.min);
+  const max = parseFloat(slider.max);
+  const val = parseFloat(slider.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  slider.style.setProperty("--pct", pct.toFixed(1) + "%");
+}
+
 /* ── Controls ───────────────────────────────────────────────── */
 
 function initControls() {
-  // Generic chip-picker factory: clicking a chip updates state and re-renders
-  function initPicker(containerId, stateKey) {
-    const container = $(containerId);
-    container.addEventListener("click", (e) => {
-      const chip = e.target.closest(`.chip[data-${stateKey}]`);
-      if (!chip) return;
+  // Background colour picker
+  els.bgColorInput.addEventListener("input", () => {
+    state.settings.bgColor = els.bgColorInput.value;
+    render();
+    saveSession();
+  });
 
-      container.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
+  // Padding slider
+  els.paddingSlider.addEventListener("input", () => {
+    const val = parseInt(els.paddingSlider.value, 10);
+    state.settings.padding  = val;
+    els.paddingVal.textContent = val + "px";
+    refreshSlider(els.paddingSlider);
+    render();
+    saveSession();
+  });
 
-      state.settings[stateKey]        = chip.dataset[stateKey];
-      state.settings.customGradient   = null; // clear random gradient on preset pick
-      render();
-      saveSession();
-    });
-  }
+  // Corner radius slider
+  els.radiusSlider.addEventListener("input", () => {
+    const val = parseInt(els.radiusSlider.value, 10);
+    state.settings.radius  = val;
+    els.radiusVal.textContent = val + "px";
+    refreshSlider(els.radiusSlider);
+    render();
+    saveSession();
+  });
 
-  initPicker("bgPicker",      "bg");
-  initPicker("paddingPicker", "padding");
-  initPicker("radiusPicker",  "radius");
-  initPicker("shadowPicker",  "shadow");
-
-  // Shuffle button — generate a random pastel gradient
-  els.shuffleBtn.addEventListener("click", () => {
-    const a = randomPastel();
-    const b = randomPastel();
-
-    state.settings.bg             = "custom";
-    state.settings.customGradient = [a, b];
-
-    // Deactivate all bg preset chips so none appears selected
-    els.bgPicker.querySelectorAll(".chip[data-bg]").forEach((c) =>
-      c.classList.remove("active")
-    );
-
+  // Shadow slider
+  els.shadowSlider.addEventListener("input", () => {
+    const val = parseInt(els.shadowSlider.value, 10);
+    state.settings.shadow  = val;
+    els.shadowVal.textContent = val + "%";
+    refreshSlider(els.shadowSlider);
     render();
     saveSession();
   });
 }
 
-function randomPastel() {
-  const h = Math.floor(Math.random() * 360);
-  const s = 35 + Math.floor(Math.random() * 30); // 35–65 %
-  const l = 82 + Math.floor(Math.random() * 12); // 82–94 %
-  return `hsl(${h},${s}%,${l}%)`;
-}
-
+/** Push saved settings back into the UI controls. */
 function applySettingsToUI() {
-  const { bg, padding, radius, shadow } = state.settings;
-  syncPicker("bgPicker",      "bg",      bg);
-  syncPicker("paddingPicker", "padding", padding);
-  syncPicker("radiusPicker",  "radius",  radius);
-  syncPicker("shadowPicker",  "shadow",  shadow);
-}
+  const { bgColor, padding, radius, shadow } = state.settings;
 
-function syncPicker(containerId, dataKey, value) {
-  const container = $(containerId);
-  if (!container) return;
-  container.querySelectorAll(`.chip[data-${dataKey}]`).forEach((c) => {
-    c.classList.toggle("active", c.dataset[dataKey] === value);
-  });
+  els.bgColorInput.value = bgColor;
+
+  els.paddingSlider.value    = padding;
+  els.paddingVal.textContent = padding + "px";
+  refreshSlider(els.paddingSlider);
+
+  els.radiusSlider.value    = radius;
+  els.radiusVal.textContent = radius + "px";
+  refreshSlider(els.radiusSlider);
+
+  els.shadowSlider.value    = shadow;
+  els.shadowVal.textContent = shadow + "%";
+  refreshSlider(els.shadowSlider);
 }
 
 /* ── Export ─────────────────────────────────────────────────── */
@@ -463,9 +434,9 @@ function syncPicker(containerId, dataKey, value) {
 function initExport() {
   els.exportBtn.addEventListener("click", () => {
     if (!state.image) return;
-    const link      = document.createElement("a");
-    link.download   = "cue-export.png";
-    link.href       = els.canvas.toDataURL("image/png");
+    const link    = document.createElement("a");
+    link.download = "cue-export.png";
+    link.href     = els.canvas.toDataURL("image/png");
     link.click();
     showToast("Downloaded ✓");
   });
@@ -473,8 +444,8 @@ function initExport() {
   els.copyBtn.addEventListener("click", async () => {
     if (!state.image) return;
     try {
-      const blob = await new Promise((resolve) =>
-        els.canvas.toBlob(resolve, "image/png")
+      const blob = await new Promise((res) =>
+        els.canvas.toBlob(res, "image/png")
       );
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       showToast("Copied to clipboard ✓");
@@ -497,7 +468,7 @@ function showToast(msg) {
 
 /* ── Session persistence ────────────────────────────────────── */
 
-const SESSION_KEY = "cue_v1";
+const SESSION_KEY = "cue_v2";
 
 function saveSession() {
   try {
@@ -509,7 +480,7 @@ function saveSession() {
       })
     );
   } catch {
-    // Storage quota exceeded — fail silently
+    // Silently ignore quota errors — the app still works, just won't persist
   }
 }
 
@@ -547,6 +518,11 @@ window.addEventListener("resize", () => {
 /* ── Init ───────────────────────────────────────────────────── */
 
 function init() {
+  // Initialise slider track fills from their default HTML values
+  refreshSlider(els.paddingSlider);
+  refreshSlider(els.radiusSlider);
+  refreshSlider(els.shadowSlider);
+
   initUpload();
   initURLInput();
   initClipboard();
