@@ -74,6 +74,26 @@ button {
     z-index: 200;
 }
 
+.reset-btn {
+    margin-left: auto;
+    padding: 6px 13px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 12.5px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    white-space: nowrap;
+}
+
+.reset-btn:hover {
+    background: #f5f5f5;
+    border-color: #c8c8c8;
+    color: var(--color-text);
+}
+
 .logo {
     display: flex;
     align-items: center;
@@ -121,60 +141,16 @@ button {
     padding: 48px 40px;
 }
 
-/* ── Empty state ────────────────────────────────────────────── */
+/* ── Empty state (upload UI, centered in preview area) ──────── */
 
 .empty-state {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    user-select: none;
-    pointer-events: none;
-}
-
-.empty-graphic {
-    position: relative;
-    width: 128px;
-    height: 108px;
-    margin-bottom: 6px;
-}
-
-.eg-card {
-    position: absolute;
-    width: 84px;
-    height: 60px;
-    border-radius: 10px;
-    left: 50%;
-    top: 50%;
-}
-
-.eg-1 {
-    transform: translate(-50%, -50%) rotate(-7deg) translateY(-6px);
-    background: linear-gradient(135deg, #fdf6ec, #fce8d5);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
-}
-
-.eg-2 {
-    transform: translate(-50%, -50%) rotate(5deg) translateY(-6px);
-    background: linear-gradient(135deg, #eef2ff, #dbeafe);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
-}
-
-.eg-3 {
-    transform: translate(-50%, -50%);
-    background: #ffffff;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.empty-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: #aaa;
-}
-
-.empty-sub {
-    font-size: 12px;
-    color: var(--color-text-faint);
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
+    max-width: 460px;
+    padding: 0 16px;
 }
 
 /* ── Canvas frame ───────────────────────────────────────────── */
@@ -259,12 +235,12 @@ button {
     color: var(--color-text-faint);
 }
 
-/* ── Upload zone ────────────────────────────────────────────── */
+/* ── Upload zone (large, centered in preview area) ──────────── */
 
 .upload-zone {
-    border: 1.5px dashed var(--color-border);
-    border-radius: 10px;
-    padding: 22px 14px;
+    border: 1.5px dashed #d0d0d0;
+    border-radius: 16px;
+    padding: 56px 32px;
     text-align: center;
     cursor: pointer;
     transition:
@@ -273,39 +249,46 @@ button {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 7px;
+    background: #ffffff;
 }
 
 .upload-zone:hover,
 .upload-zone.drag-over {
-    border-color: var(--color-border-focus);
+    border-color: #aaa;
     background: #fafafa;
 }
 
 .upload-icon {
-    font-size: 20px;
-    color: var(--color-text-faint);
-    margin-bottom: 2px;
+    font-size: 28px;
+    color: #c0c0c0;
+    margin-bottom: 4px;
     line-height: 1;
 }
 
 .upload-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--color-text-muted);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--color-text);
 }
 
 .upload-sub {
-    font-size: 12px;
-    color: var(--color-text-faint);
+    font-size: 14px;
+    color: var(--color-text-muted);
 }
 
 .upload-formats {
-    font-size: 10.5px;
+    font-size: 12px;
     color: var(--color-text-faint);
     font-family: var(--font-mono);
-    margin-top: 3px;
-    letter-spacing: 0.02em;
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+}
+
+.upload-paste {
+    font-size: 12px;
+    color: var(--color-text-faint);
+    margin-top: 6px;
 }
 
 .link-btn {
@@ -324,109 +307,7 @@ button {
     color: var(--color-text);
 }
 
-/* ── Divider ────────────────────────────────────────────────── */
 
-.or-divider {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--color-text-faint);
-    font-size: 11px;
-}
-
-.or-divider::before,
-.or-divider::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--color-border);
-}
-
-/* ── URL input ──────────────────────────────────────────────── */
-
-.url-input-wrap {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-
-.url-input {
-    flex: 1;
-    min-width: 0;
-    height: 34px;
-    padding: 0 10px;
-    background: #f7f7f7;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 12px;
-    font-family: var(--font-mono);
-    color: var(--color-text);
-    outline: none;
-    transition:
-        border-color 0.15s,
-        background 0.15s;
-}
-
-.url-input::placeholder {
-    color: var(--color-text-faint);
-}
-
-.url-input:focus {
-    border-color: var(--color-border-focus);
-    background: #ffffff;
-}
-
-.fetch-btn {
-    width: 34px;
-    height: 34px;
-    flex-shrink: 0;
-    border-radius: 8px;
-    background: var(--color-chip-bg);
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.12s;
-}
-
-.fetch-btn:hover {
-    background: var(--color-chip-hover);
-}
-
-.fetch-btn.loading {
-    pointer-events: none;
-    opacity: 0.5;
-}
-
-.url-hint {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    line-height: 1.5;
-    min-height: 16px;
-}
-
-.url-hint.error {
-    color: #d44;
-}
-
-/* ── Spinner ────────────────────────────────────────────────── */
-
-.spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(0, 0, 0, 0.12);
-    border-top-color: #555;
-    border-radius: 50%;
-    animation: spin 0.65s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
 
 /* ── Controls ───────────────────────────────────────────────── */
 
@@ -708,17 +589,31 @@ button {
         overflow: hidden;
     }
 
-    /* Preview pinned at top */
+    /* Preview pinned at top — shows upload UI or canvas */
     .preview-area {
         flex: none;
-        height: 44vh;
-        padding: 24px 20px;
+        height: 52vh;
+        padding: 24px 16px;
         border-bottom: 1px solid var(--color-border);
         overflow: hidden;
     }
 
+    .empty-state {
+        max-width: 100%;
+        padding: 0;
+    }
+
+    .upload-zone {
+        padding: 32px 20px;
+        border-radius: 12px;
+    }
+
+    .upload-title {
+        font-size: 15px;
+    }
+
     .frame canvas {
-        max-height: calc(44vh - 80px);
+        max-height: calc(52vh - 80px);
         width: auto;
     }
 

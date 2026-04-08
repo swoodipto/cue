@@ -14,41 +14,19 @@
                 <span class="logo-text">Cue</span>
             </div>
             <span class="header-tagline">Present anything, beautifully.</span>
+            <button class="reset-btn hidden" id="resetBtn" title="Start over with a new image">
+                ↺ New image
+            </button>
         </header>
 
-        <!-- ── Main layout ─────────────────────────────────────── -->
         <main class="layout">
-            <!-- CENTER: Preview -->
+            <!-- CENTER: Preview area -->
+            <!-- Before image → upload UI  |  After image → canvas -->
             <div class="preview-area" id="previewArea">
-                <!-- Empty state -->
+
+                <!-- Empty state: upload UI (hidden when image is loaded) -->
                 <div class="empty-state" id="emptyState">
-                    <div class="empty-graphic">
-                        <div class="eg-card eg-1"></div>
-                        <div class="eg-card eg-2"></div>
-                        <div class="eg-card eg-3"></div>
-                    </div>
-                    <p class="empty-title">Your presentation appears here</p>
-                    <p class="empty-sub">
-                        Upload an image, paste a URL, or press ⌘V
-                    </p>
-                </div>
 
-                <!-- Canvas frame (hidden until image loaded) -->
-                <div class="frame-wrap hidden" id="frameWrap">
-                    <div class="frame">
-                        <canvas id="previewCanvas"></canvas>
-                    </div>
-                    <p class="frame-hint">Live preview · 2× export</p>
-                </div>
-            </div>
-
-            <!-- RIGHT: Controls panel -->
-            <aside class="panel" id="panel">
-                <!-- ── Input ──────────────────────────────────────── -->
-                <section class="panel-section" id="section-input">
-                    <p class="section-label">Add Image</p>
-
-                    <!-- Upload zone -->
                     <div class="upload-zone" id="uploadZone">
                         <input
                             type="file"
@@ -64,33 +42,24 @@
                                 browse files
                             </button>
                         </p>
-                        <p class="upload-formats">
-                            PNG · JPG · WEBP · ⌘V to paste
-                        </p>
-                    </div>
+                        <p class="upload-formats">PNG · JPG · WEBP</p>
+                        <p class="upload-paste">or paste an image / URL &nbsp;—&nbsp; ⌘V</p>
+                        </div>
 
-                    <div class="or-divider"><span>or</span></div>
+                </div>
 
-                    <!-- URL input -->
-                    <div class="url-input-wrap">
-                        <input
-                            type="url"
-                            id="urlInput"
-                            class="url-input"
-                            placeholder="Paste image URL…"
-                            spellcheck="false"
-                            autocomplete="off"
-                        />
-                        <button
-                            class="fetch-btn"
-                            id="fetchBtn"
-                            title="Load image"
-                        >
-                            →
-                        </button>
+                <!-- Canvas frame (shown when image is loaded) -->
+                <div class="frame-wrap hidden" id="frameWrap">
+                    <div class="frame">
+                        <canvas id="previewCanvas"></canvas>
                     </div>
-                    <p class="url-hint" id="urlHint"></p>
-                </section>
+                    <p class="frame-hint">Live preview · 2× export</p>
+                </div>
+
+            </div>
+
+            <!-- RIGHT: Controls panel (hidden until first image is loaded) -->
+            <aside class="panel hidden" id="panel">
 
                 <!-- ── Appearance (hidden until image loaded) ─────── -->
                 <section class="panel-section hidden" id="section-style">
@@ -120,9 +89,10 @@
                                 title="Pick background color"
                             />
                         </div>
-                        <div class="chip-row" id="noisePicker">
-                            <button class="chip active" data-noise="false">No noise</button>
-                            <button class="chip" data-noise="true">Noise</button>
+                        <div class="chip-row" id="patternPicker">
+                            <button class="chip active" data-pattern="none">None</button>
+                            <button class="chip" data-pattern="noise">Noise</button>
+                            <button class="chip" data-pattern="dots">Dots</button>
                         </div>
                     </div>
 
@@ -131,8 +101,15 @@
                         <div class="control-row">
                             <span class="control-label">Padding</span>
                             <span class="val-group">
-                                <input type="number" class="control-val" id="paddingVal"
-                                    value="60" min="0" max="120" step="4" />
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="paddingVal"
+                                    value="60"
+                                    min="0"
+                                    max="120"
+                                    step="4"
+                                />
                                 <span class="control-unit">px</span>
                             </span>
                         </div>
@@ -152,8 +129,15 @@
                         <div class="control-row">
                             <span class="control-label">Corner Radius</span>
                             <span class="val-group">
-                                <input type="number" class="control-val" id="radiusVal"
-                                    value="18" min="0" max="60" step="1" />
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="radiusVal"
+                                    value="18"
+                                    min="0"
+                                    max="60"
+                                    step="1"
+                                />
                                 <span class="control-unit">px</span>
                             </span>
                         </div>
@@ -173,8 +157,15 @@
                         <div class="control-row">
                             <span class="control-label">Shadow</span>
                             <span class="val-group">
-                                <input type="number" class="control-val" id="shadowVal"
-                                    value="40" min="0" max="100" step="1" />
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="shadowVal"
+                                    value="40"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                />
                                 <span class="control-unit">%</span>
                             </span>
                         </div>
@@ -208,12 +199,11 @@
                     </div>
                     <p class="export-note">2× resolution · No watermark</p>
                 </section>
+
             </aside>
         </main>
 
-        <!-- Toast notification -->
         <div class="toast" id="toast"></div>
-
         <script src="app.js"></script>
     </body>
 </html>
