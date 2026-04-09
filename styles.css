@@ -81,9 +81,9 @@ svg {
 
 .reset-btn {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     margin-left: auto;
-    padding: 6px 13px;
+    padding: 6px 10px;
     border-radius: 8px;
     background: transparent;
     border: 1px solid var(--color-border);
@@ -101,13 +101,13 @@ svg {
 }
 
 .reset-btn:hover {
-    background: #f5f5f5;
-    border-color: #c8c8c8;
-    color: var(--color-text);
+    background: #fff4f4;
+    border-color: #ffb4b4;
+    color: #e41a1a;
 }
 
 .reset-btn:hover svg * {
-    stroke: var(--color-text);
+    stroke: #e41a1a;
 }
 
 .logo {
