@@ -521,6 +521,8 @@ button {
 .export-icon {
     font-size: 15px;
     line-height: 1;
+    display: flex;
+    align-items: center;
 }
 
 .copy-btn {
@@ -528,7 +530,7 @@ button {
     height: 38px;
     flex-shrink: 0;
     border-radius: 9px;
-    background: var(--color-chip-bg);
+    background: var(--color-panel);
     border: 1px solid var(--color-border);
     color: var(--color-text-muted);
     font-size: 17px;
@@ -541,8 +543,9 @@ button {
 }
 
 .copy-btn:hover {
-    background: var(--color-chip-hover);
     color: var(--color-text);
+    border-color: #c0c0c0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .export-note {
