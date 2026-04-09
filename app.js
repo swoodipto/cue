@@ -24,6 +24,7 @@ const state = {
 /* ── Canvas size presets ────────────────────────────────────── */
 
 const CANVAS_PRESETS = {
+  "4:3":  { cW: 600, cH: 450 },
   "16:9": { cW: 640, cH: 360 },
   "1:1":  { cW: 560, cH: 560 },
   "9:16": { cW: 338, cH: 600 },
@@ -57,8 +58,8 @@ function adaptivePatternColor(hexBg) {
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
   // Scale alpha so very light or very dark bgs get slightly stronger contrast
   return lum > 0.5
-    ? `rgba(0,0,0,${(0.06 + 0.12 * lum).toFixed(3)})`
-    : `rgba(255,255,255,${(0.10 + 0.15 * (1 - lum)).toFixed(3)})`;
+    ? `rgba(0,0,0,${(0.05 + 0.12 * lum).toFixed(3)})`
+    : `rgba(255,255,255,${(0.10 + 0.16 * (1 - lum)).toFixed(3)})`;
 }
 
 /**
@@ -95,7 +96,7 @@ function paintNoise(ctx, w, h) {
  */
 function paintDotGrid(ctx, w, h, dotColor) {
   const spacing = 20;
-  const radius  = 1.5;
+  const radius  = 1.4;
   ctx.fillStyle = dotColor;
   ctx.beginPath();
   for (let x = spacing / 2; x < w; x += spacing) {

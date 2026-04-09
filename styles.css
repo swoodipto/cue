@@ -30,7 +30,7 @@
 
     --color-text: #1a1a1a;
     --color-text-muted: #777777;
-    --color-text-faint: #b8b8b8;
+    --color-text-faint: #b0b0b0;
 
     --color-chip-bg: #f0f0f0;
     --color-chip-hover: #e8e8e8;
@@ -97,26 +97,31 @@ button {
 .logo {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
     flex-shrink: 0;
+    vertical-align: middle;
 }
 
 .logo-mark {
-    font-size: 12px;
+    font-size: 18px;
     color: #1a1a1a;
     line-height: 1;
 }
 
 .logo-text {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
     color: var(--color-text);
+    text-transform: lowercase;
+    line-height: 1em;
 }
 
 .header-tagline {
     font-size: 13px;
     color: var(--color-text-faint);
+    text-transform: lowercase;
+    letter-spacing: -0.02em;
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -364,6 +369,7 @@ button {
 .control-label {
     font-size: 13px;
     color: var(--color-text);
+    text-transform: capitalize;
 }
 
 /* Numeric value readout — styled as a borderless number input */
@@ -386,6 +392,7 @@ button {
     padding: 0;
     /* Hide native number spinner arrows */
     -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 .control-val::-webkit-outer-spin-button,
