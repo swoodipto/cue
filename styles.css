@@ -59,6 +59,11 @@ button {
     cursor: pointer;
 }
 
+svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* ── Header ─────────────────────────────────────────────────── */
 
 .header {
@@ -75,6 +80,8 @@ button {
 }
 
 .reset-btn {
+    display: flex;
+    gap: 4px;
     margin-left: auto;
     padding: 6px 13px;
     border-radius: 8px;
@@ -83,9 +90,14 @@ button {
     color: var(--color-text-muted);
     font-size: 12.5px;
     font-family: var(--font);
+    line-height: 1em;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s, color 0.12s;
     white-space: nowrap;
+}
+
+.reset-btn svg * {
+    stroke: var(--color-text-muted);
 }
 
 .reset-btn:hover {
@@ -94,12 +106,18 @@ button {
     color: var(--color-text);
 }
 
+.reset-btn:hover svg * {
+    stroke: var(--color-text);
+}
+
 .logo {
     display: flex;
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
     vertical-align: middle;
+    cursor: default;
+    user-select: none;
 }
 
 .logo-mark {
@@ -542,10 +560,18 @@ button {
         color 0.12s;
 }
 
+.copy-btn svg * {
+    stroke: var(--color-text-muted);
+}
+
 .copy-btn:hover {
+    background: #f5f5f5;
+    border-color: #c8c8c8;
     color: var(--color-text);
-    border-color: #c0c0c0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.copy-btn:hover svg * {
+    stroke: var(--color-text);
 }
 
 .export-note {
