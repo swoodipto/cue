@@ -204,25 +204,31 @@ function render() {
   const preset = CANVAS_PRESETS[state.settings.canvasRatio];
 
   if (!preset) {
-    // ── Free: canvas sized to image + padding ──────────────
-    const maxW = 700;
-    const maxH = 580;
+    // ── Free: canvas sized to original image at full resolution ──
+    // No downscaling — display at 1:1 for crisp text and details
     dW = imgW;
     dH = imgH;
-    if (dW > maxW - pad * 2) { dW = maxW - pad * 2; dH = dW / aspect; }
-    if (dH > maxH - pad * 2) { dH = maxH - pad * 2; dW = dH * aspect; }
-    dW = Math.max(1, Math.round(dW));
-    dH = Math.max(1, Math.round(dH));
     cW = dW + pad * 2;
     cH = dH + pad * 2;
     ix = pad;
     iy = pad;
   } else {
-    // ── Preset ratio: fixed canvas, image centered ─────────
+    // ── Preset ratio: scale up for large images to avoid blur ──
     cW = preset.cW;
     cH = preset.cH;
+
+    // Scale preset based on image size to prevent downscaling blur
+    const baseSize = 560; // reference preset size
+    const maxImageDim = Math.max(imgW, imgH);
+    const scale = Math.max(1, maxImageDim / baseSize);
+
+    cW = Math.round(cW * scale);
+    cH = Math.round(cH * scale);
+
     const availW = Math.max(1, cW - pad * 2);
     const availH = Math.max(1, cH - pad * 2);
+
+    // Fit image into available space while preserving its aspect ratio
     if (aspect > availW / availH) {
       dW = availW;
       dH = Math.max(1, Math.round(availW / aspect));
@@ -230,6 +236,7 @@ function render() {
       dH = availH;
       dW = Math.max(1, Math.round(availH * aspect));
     }
+
     ix = Math.round((cW - dW) / 2);
     iy = Math.round((cH - dH) / 2);
   }
@@ -320,25 +327,14 @@ function loadImgElement(src, crossOrigin = null) {
 }
 
 /**
- * Compress an HTMLImageElement to a data URL small enough for localStorage.
- * Caps the longest dimension at 1 200 px; falls back to JPEG for large images.
+ * Return the image as a data URL without compression — preserve full quality.
  */
 function toStorageURL(img) {
-  const MAX = 1200;
-  let w = img.naturalWidth;
-  let h = img.naturalHeight;
-  if (w > MAX || h > MAX) {
-    const ratio = Math.min(MAX / w, MAX / h);
-    w = Math.round(w * ratio);
-    h = Math.round(h * ratio);
-  }
   const off = document.createElement("canvas");
-  off.width  = w;
-  off.height = h;
-  off.getContext("2d").drawImage(img, 0, 0, w, h);
-  const png = off.toDataURL("image/png");
-  if (png.length <= 600_000) return png;
-  return off.toDataURL("image/jpeg", 0.88);
+  off.width  = img.naturalWidth;
+  off.height = img.naturalHeight;
+  off.getContext("2d").drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+  return off.toDataURL("image/png");
 }
 
 async function setImage(dataURL) {
@@ -375,11 +371,14 @@ async function loadFromURL(url) {
   showToast("Loading image…");
   try {
     const img = await loadImgElement(url, "anonymous");
-    const off = document.createElement("canvas");
-    off.width  = img.naturalWidth;
-    off.height = img.naturalHeight;
-    off.getContext("2d").drawImage(img, 0, 0);
-    await setImage(off.toDataURL("image/png"));
+    // For URL-loaded images, use the URL directly as the source
+    // This avoids creating huge data URLs for large images
+    state.image = img;
+    showPreview();
+    render();
+    // Still compress for storage, but the display uses the original
+    state.imageDataURL = toStorageURL(img);
+    saveSession();
   } catch {
     showToast("Couldn't load that URL — make sure it's a direct image link.");
   }
