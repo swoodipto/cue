@@ -81,10 +81,19 @@
                         </div>
                     </div>
 
-                    <!-- Background colour + noise -->
+                    <!-- Background type + colour/blur -->
                     <div class="control-group">
+                        <span class="control-label">Background</span>
+                        <div class="chip-row" id="bgTypePicker">
+                            <button class="chip active" data-bg-type="solid">Solid</button>
+                            <button class="chip" data-bg-type="blur">Blur</button>
+                        </div>
+                    </div>
+
+                    <!-- Background colour (only shown when solid) -->
+                    <div class="control-group" id="bgColorControl">
                         <div class="control-row">
-                            <span class="control-label">Background</span>
+                            <span class="control-label">Color</span>
                             <input
                                 type="color"
                                 id="bgColorInput"
@@ -93,16 +102,10 @@
                                 title="Pick background color"
                             />
                         </div>
-                        <div class="chip-row" id="patternPicker">
-                            <button class="chip active" data-pattern="none">None</button>
-                            <button class="chip" data-pattern="noise">Noise</button>
-                            <button class="chip" data-pattern="dots">Dots</button>
-                            <button class="chip" data-pattern="blur">Blur</button>
-                        </div>
                     </div>
 
-                    <!-- Blur amount slider (only shown when Blur pattern is active) -->
-                    <div class="control-group hidden" id="blurControl">
+                    <!-- Blur amount slider (only shown when blur background) -->
+                    <div class="control-group hidden" id="bgBlurControl">
                         <div class="control-row">
                             <span class="control-label">Blur amount</span>
                             <span class="val-group">
@@ -126,6 +129,82 @@
                             max="80"
                             value="20"
                             step="2"
+                        />
+                    </div>
+
+                    <!-- Pattern -->
+                    <div class="control-group">
+                        <span class="control-label">Pattern</span>
+                        <div class="chip-row" id="patternPicker">
+                            <button class="chip active" data-pattern="none">None</button>
+                            <button class="chip" data-pattern="noise">Noise</button>
+                            <button class="chip" data-pattern="dots">Dots</button>
+                        </div>
+                    </div>
+
+                    <!-- Pattern scale slider (only shown when noise or dots) -->
+                    <div class="control-group hidden" id="patternScaleControl">
+                        <div class="control-row">
+                            <span class="control-label">Scale</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="patternScaleVal"
+                                    value="10"
+                                    min="1"
+                                    max="100"
+                                    step="1"
+                                />
+                                <span class="control-unit">×</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="patternScaleSlider"
+                            min="1"
+                            max="100"
+                            value="10"
+                            step="1"
+                        />
+                    </div>
+
+                    <!-- Pattern blend mode (only shown when noise or dots) -->
+                    <div class="control-group hidden" id="patternBlendControl">
+                        <span class="control-label">Blend</span>
+                        <div class="chip-row" id="patternBlendPicker">
+                            <button class="chip active" data-blend="normal">Normal</button>
+                            <button class="chip" data-blend="overlay">Overlay</button>
+                            <button class="chip" data-blend="screen">Screen</button>
+                        </div>
+                    </div>
+
+                    <!-- Pattern opacity slider (only shown when noise or dots) -->
+                    <div class="control-group hidden" id="patternOpacityControl">
+                        <div class="control-row">
+                            <span class="control-label">Opacity</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="patternOpacityVal"
+                                    value="50"
+                                    min="1"
+                                    max="100"
+                                    step="1"
+                                />
+                                <span class="control-unit"></span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="patternOpacitySlider"
+                            min="1"
+                            max="100"
+                            value="50"
+                            step="1"
                         />
                     </div>
 

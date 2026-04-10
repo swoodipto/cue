@@ -11,9 +11,13 @@ const state = {
   image: null,        // HTMLImageElement currently displayed
   imageDataURL: null, // compressed data URL persisted to localStorage
   settings: {
+    bgType:      "solid",   // "solid" | "blur"
     bgColor:     "#ffffff", // solid background colour
-    pattern:     "none",    // "none" | "noise" | "dots" | "blur"
-    blurAmount:  20,        // px — 4–80 (used when pattern === "blur")
+    blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
+    pattern:     "none",    // "none" | "noise" | "dots"
+    patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
+    patternBlendMode: "normal", // "normal" | "overlay" | "screen"
+    patternOpacity: 50,     // 1–100 ( /100 for actual opacity)
     canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
     padding:     60,        // px — 0–120
     radius:      18,        // px — 0–60
@@ -58,8 +62,8 @@ function adaptivePatternColor(hexBg) {
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
   // Scale alpha so very light or very dark bgs get slightly stronger contrast
   return lum > 0.5
-    ? `rgba(0,0,0,${(0.05 + 0.12 * lum).toFixed(3)})`
-    : `rgba(255,255,255,${(0.10 + 0.16 * (1 - lum)).toFixed(3)})`;
+    ? `rgba(0,0,0,0.8)`
+    : `rgba(255,255,255,0.8)`;
 }
 
 /**
@@ -68,7 +72,7 @@ function adaptivePatternColor(hexBg) {
  * drawImage (unlike putImageData) respects the current transform, so the
  * logical w×h fills the full 2× physical canvas correctly.
  */
-function paintNoise(ctx, w, h) {
+function paintNoise(ctx, w, h, scale = 1, blendMode = "overlay", opacity = 1) {
   const off = document.createElement("canvas");
   off.width  = w;
   off.height = h;
@@ -83,8 +87,8 @@ function paintNoise(ctx, w, h) {
 
   const prevOp    = ctx.globalCompositeOperation;
   const prevAlpha = ctx.globalAlpha;
-  ctx.globalCompositeOperation = "overlay";
-  ctx.globalAlpha = 0.09;
+  ctx.globalCompositeOperation = blendMode;
+  ctx.globalAlpha = opacity * 0.8 * scale;
   ctx.drawImage(off, 0, 0, w, h);
   ctx.globalCompositeOperation = prevOp;
   ctx.globalAlpha = prevAlpha;
@@ -94,9 +98,13 @@ function paintNoise(ctx, w, h) {
  * Dot grid: evenly-spaced small circles whose colour is computed from
  * adaptivePatternColor so they always complement the background.
  */
-function paintDotGrid(ctx, w, h, dotColor) {
-  const spacing = 20;
-  const radius  = 1.4;
+function paintDotGrid(ctx, w, h, dotColor, scale = 1, blendMode = "overlay", opacity = 1) {
+  const spacing = 20 * scale;
+  const radius  = 1.4 * scale;
+  const prevOp    = ctx.globalCompositeOperation;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalCompositeOperation = blendMode;
+  ctx.globalAlpha = opacity;
   ctx.fillStyle = dotColor;
   ctx.beginPath();
   for (let x = spacing / 2; x < w; x += spacing) {
@@ -106,6 +114,8 @@ function paintDotGrid(ctx, w, h, dotColor) {
     }
   }
   ctx.fill();
+  ctx.globalCompositeOperation = prevOp;
+  ctx.globalAlpha = prevAlpha;
 }
 
 /**
@@ -169,9 +179,20 @@ const els = {
   sectionExport: $("section-export"),
   // Appearance controls
   ratioPicker:   $("ratioPicker"),
+  bgTypePicker:  $("bgTypePicker"),
   bgColorInput:  $("bgColorInput"),
+  bgColorControl: $("bgColorControl"),
+  bgBlurControl:  $("bgBlurControl"),
   patternPicker: $("patternPicker"),
-  blurControl:   $("blurControl"),
+  patternScaleControl: $("patternScaleControl"),
+  patternScaleSlider: $("patternScaleSlider"),
+  patternScaleVal: $("patternScaleVal"),
+  patternBlendControl: $("patternBlendControl"),
+  patternBlendPicker: $("patternBlendPicker"),
+  patternOpacityControl: $("patternOpacityControl"),
+  patternOpacitySlider: $("patternOpacitySlider"),
+  patternOpacityVal: $("patternOpacityVal"),
+  blurControl:   $("blurControl"), // old, remove?
   blurSlider:    $("blurSlider"),
   blurVal:       $("blurVal"),
   paddingSlider: $("paddingSlider"),
@@ -194,7 +215,9 @@ function render() {
   const img     = state.image;
   const pad     = state.settings.padding;
   const r       = state.settings.radius;
-  const bgColor = state.settings.bgColor;
+  const { bgType, bgColor, blurAmount, pattern, patternScale, patternBlendMode, patternOpacity } = state.settings;
+  const scale = patternScale / 10;
+  const opacity = patternOpacity / 100;
 
   const imgW   = img.naturalWidth;
   const imgH   = img.naturalHeight;
@@ -269,18 +292,19 @@ function render() {
   ctx.save();
   ctx.scale(SCALE, SCALE);
 
-  // 1 — Solid background
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, cW, cH);
+  // 1 — Background
+  if (bgType === "solid") {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, cW, cH);
+  } else if (bgType === "blur") {
+    paintBlurredBackground(ctx, img, cW, cH, blurAmount);
+  }
 
-  // 2 — Optional texture / background pattern
-  const { pattern } = state.settings;
+  // 2 — Optional pattern (background-only)
   if (pattern === "noise") {
-    paintNoise(ctx, cW, cH);
+    paintNoise(ctx, cW, cH, scale, patternBlendMode, opacity);
   } else if (pattern === "dots") {
-    paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor));
-  } else if (pattern === "blur") {
-    paintBlurredBackground(ctx, img, cW, cH, state.settings.blurAmount);
+    paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor), scale, patternBlendMode, opacity);
   }
 
   // 3 — Composite image + shadow in one pass via an offscreen canvas.
@@ -558,6 +582,19 @@ function initControls() {
     saveSession();
   });
 
+  // Background type
+  els.bgTypePicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-bg-type]");
+    if (!chip) return;
+    els.bgTypePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.settings.bgType = chip.dataset.bgType;
+    els.bgColorControl.classList.toggle("hidden", chip.dataset.bgType !== "solid");
+    els.bgBlurControl.classList.toggle("hidden", chip.dataset.bgType !== "blur");
+    render();
+    saveSession();
+  });
+
   // Background colour
   els.bgColorInput.addEventListener("input", () => {
     state.settings.bgColor = els.bgColorInput.value;
@@ -565,20 +602,40 @@ function initControls() {
     saveSession();
   });
 
-  // Pattern picker (none / noise / dots / blur)
+  // Pattern picker (none / noise / dots)
   els.patternPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-pattern]");
     if (!chip) return;
     els.patternPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.pattern = chip.dataset.pattern;
-    els.blurControl.classList.toggle("hidden", chip.dataset.pattern !== "blur");
+    const hasPattern = chip.dataset.pattern !== "none";
+    els.patternScaleControl.classList.toggle("hidden", !hasPattern);
+    els.patternBlendControl.classList.toggle("hidden", !hasPattern);
+    els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
     render();
     saveSession();
   });
 
-  // Blur amount slider (only visible when pattern === "blur")
+  // Pattern blend mode picker
+  els.patternBlendPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-blend]");
+    if (!chip) return;
+    els.patternBlendPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.settings.patternBlendMode = chip.dataset.blend;
+    render();
+    saveSession();
+  });
+
+  // Blur amount slider (only visible when bgType === "blur")
   connectSlider(els.blurSlider, els.blurVal, "blurAmount", 4, 80);
+
+  // Pattern scale slider (only visible when pattern !== "none")
+  connectSlider(els.patternScaleSlider, els.patternScaleVal, "patternScale", 1, 100);
+
+  // Pattern opacity slider (only visible when pattern !== "none")
+  connectSlider(els.patternOpacitySlider, els.patternOpacityVal, "patternOpacity", 1, 100);
 
   // Sliders + number inputs
   connectSlider(els.paddingSlider, els.paddingVal, "padding", 0, 120);
@@ -591,18 +648,35 @@ function initControls() {
 
 /** Push saved settings back into every UI control after session restore. */
 function applySettingsToUI() {
-  const { bgColor, pattern, canvasRatio, padding, radius, shadow, blurAmount } = state.settings;
+  const { bgType, bgColor, pattern, canvasRatio, padding, radius, shadow, blurAmount, patternScale, patternBlendMode, patternOpacity } = state.settings;
 
   els.bgColorInput.value = bgColor;
 
-  syncChipPicker(els.ratioPicker,   "ratio",   canvasRatio);
-  syncChipPicker(els.patternPicker, "pattern", pattern);
+  syncChipPicker(els.bgTypePicker,  "bg-type", bgType);
+  syncChipPicker(els.ratioPicker,    "ratio",   canvasRatio);
+  syncChipPicker(els.patternPicker,  "pattern", pattern);
 
-  // Show blur slider only when blur pattern is active
-  els.blurControl.classList.toggle("hidden", pattern !== "blur");
+  // Show controls based on selections
+  els.bgColorControl.classList.toggle("hidden", bgType !== "solid");
+  els.bgBlurControl.classList.toggle("hidden", bgType !== "blur");
+  const hasPattern = pattern !== "none";
+  els.patternScaleControl.classList.toggle("hidden", !hasPattern);
+  els.patternBlendControl.classList.toggle("hidden", !hasPattern);
+  els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
+
+  syncChipPicker(els.patternBlendPicker, "blend", patternBlendMode);
+
   els.blurSlider.value = blurAmount;
   els.blurVal.value    = blurAmount;
   refreshSlider(els.blurSlider);
+
+  els.patternScaleSlider.value = patternScale;
+  els.patternScaleVal.value    = patternScale;
+  refreshSlider(els.patternScaleSlider);
+
+  els.patternOpacitySlider.value = patternOpacity;
+  els.patternOpacityVal.value    = patternOpacity;
+  refreshSlider(els.patternOpacitySlider);
 
   els.paddingSlider.value = padding;
   els.paddingVal.value    = padding;
@@ -677,6 +751,11 @@ async function restoreSession() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     if (saved.settings) {
+      // Migrate old blur pattern to new bgType
+      if (saved.settings.pattern === "blur") {
+        saved.settings.bgType = "blur";
+        saved.settings.pattern = "none";
+      }
       state.settings = { ...state.settings, ...saved.settings };
       applySettingsToUI();
     }
@@ -704,6 +783,9 @@ function init() {
   refreshSlider(els.paddingSlider);
   refreshSlider(els.radiusSlider);
   refreshSlider(els.shadowSlider);
+  refreshSlider(els.blurSlider);
+  refreshSlider(els.patternScaleSlider);
+  refreshSlider(els.patternOpacitySlider);
 
   initUpload();
   initClipboard();
