@@ -183,18 +183,20 @@ svg {
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    animation: fadeUp 0.22s ease;
+    animation: scaleDown 0.25s cubic-bezier(0,.69,.1,1.64);
 }
 
-@keyframes fadeUp {
+@keyframes scaleDown {
     from {
-        opacity: 0;
-        transform: translateY(8px);
+        transform: scale(1.1);
     }
     to {
-        opacity: 1;
-        transform: translateY(0);
+        transform: scale(1);
     }
+}
+
+.paste-animate {
+    animation: scaleDown 0.25s cubic-bezier(0,.69,.1,1.64);
 }
 
 .frame {
@@ -211,7 +213,6 @@ svg {
     display: block;
     max-width: 100%;
     height: auto;
-    image-rendering: crisp-edges;
 }
 
 .frame-hint {

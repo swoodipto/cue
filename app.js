@@ -399,6 +399,16 @@ function showPreview() {
   requestAnimationFrame(() => { els.frameWrap.style.animation = ""; });
 }
 
+function playPasteAnimation() {
+  const target = state.image ? els.frameWrap : els.uploadZone;
+  target.classList.remove("paste-animate");
+  void target.offsetWidth;
+  target.classList.add("paste-animate");
+  target.addEventListener("animationend", () => {
+    target.classList.remove("paste-animate");
+  }, { once: true });
+}
+
 function resetCanvas() {
   state.image        = null;
   state.imageDataURL = null;
@@ -464,6 +474,7 @@ function initClipboard() {
     const imageItem = items.find((it) => it.type.startsWith("image/"));
     if (imageItem) {
       e.preventDefault();
+      playPasteAnimation();
       handleFile(imageItem.getAsFile());
       return;
     }
