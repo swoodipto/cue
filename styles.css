@@ -161,7 +161,7 @@ svg {
     justify-content: center;
     background: var(--color-bg);
     overflow: auto;
-    padding: 48px 40px;
+    padding: 0 40px;
 }
 
 /* ── Empty state (upload UI, centered in preview area) ──────── */
@@ -203,6 +203,8 @@ svg {
     border-radius: 6px;
     overflow: hidden;
     line-height: 0;
+    max-width: 100%;
+    max-height: 100%;
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.06),
         0 4px 16px rgba(0, 0, 0, 0.08),
@@ -212,6 +214,8 @@ svg {
 .frame canvas {
     display: block;
     max-width: 100%;
+    max-height: 100%;
+    width: auto;
     height: auto;
 }
 

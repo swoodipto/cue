@@ -157,6 +157,7 @@ const els = {
   fileInput:     $("fileInput"),
   browseBtn:     $("browseBtn"),
   emptyState:    $("emptyState"),
+  previewArea:   $("previewArea"),
   frameWrap:     $("frameWrap"),
   canvas:        $("previewCanvas"),
   exportBtn:     $("exportBtn"),
@@ -244,9 +245,26 @@ function render() {
   // Size the pixel buffer at 2×
   els.canvas.width  = cW * SCALE;
   els.canvas.height = cH * SCALE;
-  // Only set CSS width — height:auto prevents stretching on container resize
-  els.canvas.style.width  = cW + "px";
-  els.canvas.style.height = "";
+
+  // Display the canvas with responsive scaling so it always fits in the
+  // preview window, even for very tall or wide images.
+  const previewW = Math.max(1, els.previewArea.clientWidth - 24);
+  const previewH = Math.max(1, els.previewArea.clientHeight - 24);
+  let displayW = cW;
+  let displayH = cH;
+  const displayRatio = cW / cH;
+
+  if (displayW > previewW) {
+    displayW = previewW;
+    displayH = Math.round(displayW / displayRatio);
+  }
+  if (displayH > previewH) {
+    displayH = previewH;
+    displayW = Math.round(displayH * displayRatio);
+  }
+
+  els.canvas.style.width  = displayW + "px";
+  els.canvas.style.height = displayH + "px";
 
   ctx.save();
   ctx.scale(SCALE, SCALE);
