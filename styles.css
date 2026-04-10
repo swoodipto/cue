@@ -113,7 +113,7 @@ svg {
 .logo {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
     flex-shrink: 0;
     vertical-align: middle;
     cursor: default;
@@ -121,13 +121,13 @@ svg {
 }
 
 .logo-mark {
-    font-size: 18px;
+    font-size: 32px;
     color: #1a1a1a;
     line-height: 1;
 }
 
 .logo-text {
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 600;
     letter-spacing: -0.04em;
     color: var(--color-text);
@@ -137,7 +137,7 @@ svg {
 
 .header-tagline {
     font-size: 13px;
-    color: var(--color-text-faint);
+    color: var(--color-text-muted);
     text-transform: lowercase;
     letter-spacing: -0.02em;
 }
@@ -148,7 +148,7 @@ svg {
     display: flex;
     flex-direction: row;
     height: 100vh;
-    padding-top: var(--header-h);
+    /* padding-top: var(--header-h); */
 }
 
 /* ── Preview area ───────────────────────────────────────────── */
@@ -229,6 +229,7 @@ svg {
 /* ── Panel ──────────────────────────────────────────────────── */
 
 .panel {
+    position: relative;
     width: var(--panel-w);
     flex-shrink: 0;
     background: var(--color-panel);
@@ -252,8 +253,22 @@ svg {
     border-bottom: 1px solid var(--color-border);
 }
 
+.panel-section.rowing {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 .panel-section:last-child {
     border-bottom: none;
+}
+
+.panel-section.bottom {
+    position: absolute;
+    width: 100%;
+    bottom: 0;
+    border-top: 1px solid var(--color-border);
 }
 
 .section-label {
