@@ -614,30 +614,50 @@ svg {
 
 /* ── Toast ──────────────────────────────────────────────────── */
 
-.toast {
+.toast-container {
     position: fixed;
     bottom: 28px;
     left: 50%;
-    transform: translateX(-50%) translateY(10px);
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 0 16px;
+    z-index: 999;
+    pointer-events: none;
+}
+
+.toast {
     background: #1a1a1a;
     color: #ffffff;
     font-size: 13px;
-    padding: 9px 20px;
-    border-radius: 99px;
+    padding: 10px;
+    border-radius: 10px;
     opacity: 0;
-    pointer-events: none;
-    white-space: nowrap;
-    max-width: calc(100vw - 32px);
-    z-index: 999;
+    white-space: normal;
+    max-width: 100%;
     transition:
-        opacity 0.18s ease,
-        transform 0.18s ease;
+        opacity 0.18s ease;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
 }
 
 .toast.show {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 768px) {
+    .toast {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+@media (min-width: 769px) {
+    .toast {
+        white-space: nowrap;
+        max-width: 500px;
+    }
 }
 
 /* ── Responsive — mobile ────────────────────────────────────── */
