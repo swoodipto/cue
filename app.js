@@ -22,6 +22,8 @@ function getBrowserName() {
 const state = {
   image: null,        // HTMLImageElement currently displayed
   imageDataURL: null, // compressed data URL persisted to localStorage
+  logoImage: null,
+  logoDataURL: null,
   isDemo: true,
   imageLabel: "demo-image.png",
   settings: null,
@@ -39,6 +41,12 @@ const DEFAULT_SETTINGS = {
   padding:     60,        // px — 0–120
   radius:      18,        // px — 0–60
   shadow:      40,        // 0–100 intensity
+  overlayType: "none",    // "none" | "text" | "logo"
+  overlayText: "Your brand",
+  overlayColor: "#ffffff",
+  overlaySize: 18,        // percentage of canvas width
+  overlayOpacity: 70,     // 10–100
+  overlayPosition: "bottom-right", // corners | center
 };
 
 state.settings = { ...DEFAULT_SETTINGS };
@@ -67,6 +75,12 @@ const DEMO_IMAGES = [
     },
   },
 ];
+
+const OVERLAY_SIZE_LIMITS = {
+  none: 30,
+  text: 30,
+  logo: 30,
+};
 
 /* ── Canvas size presets ────────────────────────────────────── */
 
@@ -215,6 +229,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   uploadZone:    $("uploadZone"),
   fileInput:     $("fileInput"),
+  logoFileInput: $("logoFileInput"),
   browseBtn:     $("browseBtn"),
   emptyState:    $("emptyState"),
   previewArea:   $("previewArea"),
@@ -256,6 +271,21 @@ const els = {
   radiusVal:     $("radiusVal"),
   shadowSlider:  $("shadowSlider"),
   shadowVal:     $("shadowVal"),
+  overlayTypePicker: $("overlayTypePicker"),
+  overlayTextControl: $("overlayTextControl"),
+  overlayTextInput: $("overlayTextInput"),
+  overlayColorInput: $("overlayColorInput"),
+  overlayLogoControl: $("overlayLogoControl"),
+  overlayLogoBtn: $("overlayLogoBtn"),
+  overlayLogoHint: $("overlayLogoHint"),
+  overlayPositionControl: $("overlayPositionControl"),
+  overlayPositionPicker: $("overlayPositionPicker"),
+  overlaySizeControl: $("overlaySizeControl"),
+  overlaySizeSlider: $("overlaySizeSlider"),
+  overlaySizeVal: $("overlaySizeVal"),
+  overlayOpacityControl: $("overlayOpacityControl"),
+  overlayOpacitySlider: $("overlayOpacitySlider"),
+  overlayOpacityVal: $("overlayOpacityVal"),
 };
 
 const ctx = els.canvas.getContext("2d");
@@ -404,6 +434,75 @@ function render() {
   ctx.drawImage(imgOff, ix, iy, dW, dH);
   ctx.restore();
 
+  paintOverlay(ctx, cW, cH);
+
+  ctx.restore();
+}
+
+function getOverlayPlacement(position, boxW, boxH, canvasW, canvasH) {
+  const margin = Math.max(16, Math.round(Math.min(canvasW, canvasH) * 0.04));
+
+  switch (position) {
+    case "top-left":
+      return { x: margin, y: margin };
+    case "top-center":
+      return {
+        x: Math.round((canvasW - boxW) / 2),
+        y: margin,
+      };
+    case "top-right":
+      return { x: canvasW - boxW - margin, y: margin };
+    case "bottom-left":
+      return { x: margin, y: canvasH - boxH - margin };
+    case "bottom-center":
+      return {
+        x: Math.round((canvasW - boxW) / 2),
+        y: canvasH - boxH - margin,
+      };
+    case "bottom-right":
+    default:
+      return { x: canvasW - boxW - margin, y: canvasH - boxH - margin };
+  }
+}
+
+function paintOverlay(ctx, cW, cH) {
+  const {
+    overlayType,
+    overlayText,
+    overlayColor,
+    overlaySize,
+    overlayOpacity,
+    overlayPosition,
+  } = state.settings;
+
+  if (overlayType === "none") return;
+
+  ctx.save();
+  ctx.globalAlpha = overlayOpacity / 100;
+
+  if (overlayType === "text" && overlayText.trim()) {
+    const fontSize = Math.max(8, Math.round((cW * overlaySize) / 100));
+    ctx.font = `600 ${fontSize}px ${getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui"}`;
+    ctx.fillStyle = overlayColor;
+    ctx.textBaseline = "top";
+    const metrics = ctx.measureText(overlayText);
+    const boxW = Math.ceil(metrics.width);
+    const boxH = Math.ceil(fontSize * 1.15);
+    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, cW, cH);
+    ctx.fillText(overlayText, x, y);
+    ctx.restore();
+    return;
+  }
+
+  if (overlayType === "logo" && state.logoImage) {
+    const maxW = Math.round((cW * overlaySize) / 100);
+    const aspect = state.logoImage.naturalWidth / state.logoImage.naturalHeight || 1;
+    const boxW = Math.max(24, maxW);
+    const boxH = Math.max(24, Math.round(boxW / aspect));
+    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, cW, cH);
+    ctx.drawImage(state.logoImage, x, y, boxW, boxH);
+  }
+
   ctx.restore();
 }
 
@@ -448,6 +547,35 @@ function toStorageURL(img) {
 function updateImageLabel(label) {
   if (!els.imageLabel) return;
   els.imageLabel.textContent = label || "image_mockups.png";
+}
+
+function syncOverlaySizeBounds() {
+  const max = OVERLAY_SIZE_LIMITS[state.settings.overlayType] || OVERLAY_SIZE_LIMITS.none;
+  els.overlaySizeSlider.max = String(max);
+  els.overlaySizeVal.max = String(max);
+  if (state.settings.overlaySize > max) {
+    state.settings.overlaySize = max;
+  }
+  els.overlaySizeSlider.value = state.settings.overlaySize;
+  els.overlaySizeVal.value = state.settings.overlaySize;
+  refreshSlider(els.overlaySizeSlider);
+}
+
+function updateOverlayUI() {
+  const { overlayType } = state.settings;
+  const showText = overlayType === "text";
+  const showLogo = overlayType === "logo";
+  const showOverlayControls = overlayType !== "none";
+
+  els.overlayTextControl.classList.toggle("hidden", !showText);
+  els.overlayLogoControl.classList.toggle("hidden", !showLogo);
+  els.overlayPositionControl.classList.toggle("hidden", !showOverlayControls);
+  els.overlaySizeControl.classList.toggle("hidden", !showOverlayControls);
+  els.overlayOpacityControl.classList.toggle("hidden", !showOverlayControls);
+  els.overlayLogoHint.textContent = state.logoDataURL
+    ? "Logo ready for export."
+    : "No logo selected.";
+  syncOverlaySizeBounds();
 }
 
 function applySettings(settings) {
@@ -501,6 +629,34 @@ async function loadFileAsImage(file) {
   } finally {
     URL.revokeObjectURL(objectURL);
   }
+}
+
+async function setLogoImage(src, persist = true) {
+  try {
+    const img = await loadImgElement(src);
+    state.logoImage = img;
+    state.logoDataURL = persist ? src : null;
+    updateOverlayUI();
+    render();
+    saveSession();
+  } catch {
+    showToast("Could not load logo.");
+  }
+}
+
+function loadLogoFile(file) {
+  if (!file) return;
+  const lowerName = file.name.toLowerCase();
+  const isSupportedType = file.type === "image/png" || lowerName.endsWith(".png");
+  if (!isSupportedType) {
+    showToast("Please use a PNG logo.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    await setLogoImage(e.target.result);
+  };
+  reader.readAsDataURL(file);
 }
 
 function extractImageURLFromHTML(html) {
@@ -626,6 +782,8 @@ function playPasteAnimation() {
 async function resetCanvas() {
   state.image        = null;
   state.imageDataURL = null;
+  state.logoImage    = null;
+  state.logoDataURL  = null;
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   await loadDemoImage();
 }
@@ -651,6 +809,16 @@ function initUpload() {
   els.canvasPasteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
     await pasteFromClipboardButton();
+  });
+
+  els.overlayLogoBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    els.logoFileInput.click();
+  });
+
+  els.logoFileInput.addEventListener("change", (e) => {
+    if (e.target.files[0]) loadLogoFile(e.target.files[0]);
+    els.logoFileInput.value = "";
   });
 
   els.fileInput.addEventListener("change", (e) => {
@@ -836,6 +1004,39 @@ function initControls() {
   connectSlider(els.paddingSlider, els.paddingVal, "padding", 0, 120);
   connectSlider(els.radiusSlider,  els.radiusVal,  "radius",  0,  60);
   connectSlider(els.shadowSlider,  els.shadowVal,  "shadow",  0, 100);
+  connectSlider(els.overlaySizeSlider, els.overlaySizeVal, "overlaySize", 4, 40);
+  connectSlider(els.overlayOpacitySlider, els.overlayOpacityVal, "overlayOpacity", 10, 100);
+
+  els.overlayTypePicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-overlay-type]");
+    if (!chip) return;
+    syncChipPicker(els.overlayTypePicker, "overlayType", chip.dataset.overlayType);
+    state.settings.overlayType = chip.dataset.overlayType;
+    updateOverlayUI();
+    render();
+    saveSession();
+  });
+
+  els.overlayPositionPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-overlay-position]");
+    if (!chip) return;
+    syncChipPicker(els.overlayPositionPicker, "overlayPosition", chip.dataset.overlayPosition);
+    state.settings.overlayPosition = chip.dataset.overlayPosition;
+    render();
+    saveSession();
+  });
+
+  els.overlayTextInput.addEventListener("input", () => {
+    state.settings.overlayText = els.overlayTextInput.value;
+    render();
+    saveSession();
+  });
+
+  els.overlayColorInput.addEventListener("input", () => {
+    state.settings.overlayColor = els.overlayColorInput.value;
+    render();
+    saveSession();
+  });
 
   // Reset button
   els.resetBtn.addEventListener("click", resetCanvas);
@@ -843,7 +1044,11 @@ function initControls() {
 
 /** Push saved settings back into every UI control after session restore. */
 function applySettingsToUI() {
-  const { bgType, bgColor, pattern, canvasRatio, padding, radius, shadow, blurAmount, patternScale, patternBlendMode, patternOpacity } = state.settings;
+  const {
+    bgType, bgColor, pattern, canvasRatio, padding, radius, shadow,
+    blurAmount, patternScale, patternBlendMode, patternOpacity,
+    overlayType, overlayText, overlayColor, overlaySize, overlayOpacity, overlayPosition,
+  } = state.settings;
 
   els.bgColorInput.value = bgColor;
 
@@ -858,6 +1063,17 @@ function applySettingsToUI() {
   els.patternScaleControl.classList.toggle("hidden", !hasPattern);
   els.patternBlendControl.classList.toggle("hidden", !hasPattern);
   els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
+  syncChipPicker(els.overlayTypePicker, "overlayType", overlayType);
+  syncChipPicker(els.overlayPositionPicker, "overlayPosition", overlayPosition);
+  els.overlayTextInput.value = overlayText;
+  els.overlayColorInput.value = overlayColor;
+  els.overlaySizeSlider.value = overlaySize;
+  els.overlaySizeVal.value = overlaySize;
+  refreshSlider(els.overlaySizeSlider);
+  els.overlayOpacitySlider.value = overlayOpacity;
+  els.overlayOpacityVal.value = overlayOpacity;
+  refreshSlider(els.overlayOpacitySlider);
+  updateOverlayUI();
 
   syncChipPicker(els.patternBlendPicker, "blend", patternBlendMode);
 
@@ -936,6 +1152,7 @@ function saveSession() {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       settings:     state.settings,
       imageDataURL: state.isDemo ? null : state.imageDataURL,
+      logoDataURL:  state.logoDataURL,
     }));
   } catch { /* quota exceeded — fail silently */ }
 }
@@ -963,7 +1180,13 @@ async function restoreSession() {
         label: "my-image.png",
         isDemo: false,
       });
+      if (saved.logoDataURL) {
+        await setLogoImage(saved.logoDataURL);
+      }
       return true;
+    }
+    if (saved.logoDataURL) {
+      await setLogoImage(saved.logoDataURL);
     }
     return false;
   } catch {

@@ -303,6 +303,110 @@
                             step="1"
                         />
                     </div>
+
+                    <!-- Overlay -->
+                    <div class="control-group">
+                        <span class="control-label">Overlay</span>
+                        <div class="chip-row" id="overlayTypePicker">
+                            <button class="chip active" data-overlay-type="none">None</button>
+                            <button class="chip" data-overlay-type="text">Text</button>
+                            <button class="chip" data-overlay-type="logo">Logo</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group hidden" id="overlayTextControl">
+                        <div class="control-row">
+                            <label class="control-label" for="overlayTextInput">Text</label>
+                            <input
+                                type="color"
+                                id="overlayColorInput"
+                                class="color-swatch"
+                                value="#ffffff"
+                                title="Pick text color"
+                            />
+                        </div>
+                        <input
+                            type="text"
+                            id="overlayTextInput"
+                            class="text-input"
+                            placeholder="Add watermark text"
+                            maxlength="40"
+                        />
+                    </div>
+
+                    <div class="control-group hidden" id="overlayLogoControl">
+                        <div class="control-row">
+                            <span class="control-label">Logo</span>
+                            <button type="button" class="secondary-btn" id="overlayLogoBtn">Upload PNG</button>
+                        </div>
+                        <p class="helper-text" id="overlayLogoHint">No logo selected.</p>
+                    </div>
+
+                    <div class="control-group hidden" id="overlayPositionControl">
+                        <span class="control-label">Position</span>
+                        <div class="chip-row" id="overlayPositionPicker">
+                            <button class="chip active" data-overlay-position="top-left">Top left</button>
+                            <button class="chip" data-overlay-position="top-center">Top center</button>
+                            <button class="chip" data-overlay-position="top-right">Top right</button>
+                            <button class="chip" data-overlay-position="bottom-left">Bottom left</button>
+                            <button class="chip" data-overlay-position="bottom-center">Bottom center</button>
+                            <button class="chip" data-overlay-position="bottom-right">Bottom right</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group hidden" id="overlaySizeControl">
+                        <div class="control-row">
+                            <span class="control-label">Size</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="overlaySizeVal"
+                                    value="18"
+                                    min="4"
+                                    max="40"
+                                    step="1"
+                                />
+                                <span class="control-unit">%</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="overlaySizeSlider"
+                            min="4"
+                            max="40"
+                            value="18"
+                            step="1"
+                        />
+                    </div>
+
+                    <div class="control-group hidden" id="overlayOpacityControl">
+                        <div class="control-row">
+                            <span class="control-label">Opacity</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="overlayOpacityVal"
+                                    value="70"
+                                    min="10"
+                                    max="100"
+                                    step="1"
+                                />
+                                <span class="control-unit">%</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="overlayOpacitySlider"
+                            min="10"
+                            max="100"
+                            value="70"
+                            step="1"
+                        />
+                    </div>
                 </section>
 
                 <!-- ── Export (hidden until image loaded) ─────────── -->
@@ -347,6 +451,12 @@
         <div class="toast-container">
             <div class="toast" id="toast"></div>
         </div>
+        <input
+            type="file"
+            id="logoFileInput"
+            accept=".png,image/png"
+            hidden
+        />
         <script src="app.js"></script>
         <script>
           // Register service worker for offline support

@@ -424,6 +424,43 @@ svg {
     color: var(--color-text);
 }
 
+.text-input {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: var(--font);
+    color: var(--color-text);
+    background: #ffffff;
+    outline: none;
+}
+
+.text-input:focus {
+    border-color: var(--color-border-focus);
+}
+
+.secondary-btn {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: #f7f7f7;
+    color: var(--color-text);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+}
+
+.secondary-btn:hover {
+    background: #efefef;
+}
+
+.helper-text {
+    font-size: 11px;
+    color: var(--color-text-faint);
+    font-family: var(--font-mono);
+    line-height: 1.4;
+}
+
 
 
 /* ── Controls ───────────────────────────────────────────────── */
@@ -919,8 +956,6 @@ svg {
         min-height: 120px;
         writing-mode: vertical-lr;
         direction: rtl;
-        -webkit-appearance: slider-vertical;
-        appearance: slider-vertical;
         background: linear-gradient(
             to top,
             var(--color-text) 0%,
