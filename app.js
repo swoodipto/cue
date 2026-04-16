@@ -5,6 +5,18 @@
 
 "use strict";
 
+/* ── Browser detection ──────────────────────────────────────── */
+
+function isWebkitBrowser() {
+  const ua = navigator.userAgent.toLowerCase();
+  // Safari and WebKit-based browsers (but not Chrome/Edge which also have webkit in UA)
+  return /safari/.test(ua) && !/chrome|edge|opera/.test(ua);
+}
+
+function getBrowserName() {
+  return "WebKit-based browser";
+}
+
 /* ── State ──────────────────────────────────────────────────── */
 
 const state = {
@@ -586,6 +598,13 @@ function initControls() {
   els.bgTypePicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-bg-type]");
     if (!chip) return;
+
+    // Check if trying to select blur on webkit browser
+    if (chip.dataset.bgType === "blur" && isWebkitBrowser()) {
+      showToast(`Blur isn't supported in ${getBrowserName()}, please use Chrome or Firefox based browsers.`);
+      return;
+    }
+
     els.bgTypePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.bgType = chip.dataset.bgType;
@@ -756,6 +775,10 @@ async function restoreSession() {
         saved.settings.bgType = "blur";
         saved.settings.pattern = "none";
       }
+      // Disable blur in webkit browsers
+      if (saved.settings.bgType === "blur" && isWebkitBrowser()) {
+        saved.settings.bgType = "solid";
+      }
       state.settings = { ...state.settings, ...saved.settings };
       applySettingsToUI();
     }
@@ -779,6 +802,16 @@ window.addEventListener("resize", () => {
 /* ── Init ───────────────────────────────────────────────────── */
 
 function init() {
+  // Disable blur option in webkit browsers
+  if (isWebkitBrowser()) {
+    const blurChip = document.querySelector('.chip[data-bg-type="blur"]');
+    if (blurChip) {
+      blurChip.style.opacity = "0.5";
+      blurChip.style.cursor = "not-allowed";
+      blurChip.title = `Blur isn't supported in ${getBrowserName()}, please use Chrome or Firefox based browsers.`;
+    }
+  }
+
   // Initialise slider track fills from their default HTML values
   refreshSlider(els.paddingSlider);
   refreshSlider(els.radiusSlider);
