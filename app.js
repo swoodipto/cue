@@ -388,15 +388,14 @@ function loadImgElement(src, crossOrigin = null) {
 }
 
 /**
- * Return the image as a compressed JPEG data URL for storage efficiency.
- * Large images get stored as JPEG at 85% quality to fit localStorage quota.
+ * Return the image as a data URL without compression — preserve full quality.
  */
 function toStorageURL(img) {
   const off = document.createElement("canvas");
   off.width  = img.naturalWidth;
   off.height = img.naturalHeight;
   off.getContext("2d").drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
-  return off.toDataURL("image/jpeg", 0.85);
+  return off.toDataURL("image/png");
 }
 
 async function setImage(dataURL) {
