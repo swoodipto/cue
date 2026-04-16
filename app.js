@@ -62,20 +62,27 @@ function computeShadow(intensity) {
 /* ── Pattern helpers ────────────────────────────────────────── */
 
 /**
- * Return a semi-transparent colour that contrasts gently with the
- * background — dark on light backgrounds, light on dark ones.
+ * Return a semi-transparent colour that contrasts with the background —
+ * dark on light backgrounds, light on dark ones.
  * Both noise and dots use this so the pattern always blends.
+ * For blur backgrounds, use forBlur=true to get stronger contrast.
  */
-function adaptivePatternColor(hexBg) {
-  if (!hexBg || hexBg.length < 7) return "rgba(0,0,0,0.12)";
+function adaptivePatternColor(hexBg, forBlur = false) {
+  if (!hexBg || hexBg.length < 7) return "rgba(0,0,0,0.2)";
   const r   = parseInt(hexBg.slice(1, 3), 16) / 255;
   const g   = parseInt(hexBg.slice(3, 5), 16) / 255;
   const b   = parseInt(hexBg.slice(5, 7), 16) / 255;
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-  // Scale alpha so very light or very dark bgs get slightly stronger contrast
+  // For blur backgrounds, use stronger opacity since the blurred content
+  // can be variable. For solid backgrounds, use full opacity.
+  if (forBlur) {
+    return lum > 0.5
+      ? `rgba(0,0,0,1.0)`
+      : `rgba(255,255,255,1.0)`;
+  }
   return lum > 0.5
-    ? `rgba(0,0,0,0.8)`
-    : `rgba(255,255,255,0.8)`;
+    ? `rgba(0,0,0,1.0)`
+    : `rgba(255,255,255,1.0)`;
 }
 
 /**
@@ -100,7 +107,7 @@ function paintNoise(ctx, w, h, scale = 1, blendMode = "overlay", opacity = 1) {
   const prevOp    = ctx.globalCompositeOperation;
   const prevAlpha = ctx.globalAlpha;
   ctx.globalCompositeOperation = blendMode;
-  ctx.globalAlpha = opacity * 0.8 * scale;
+  ctx.globalAlpha = opacity * scale;
   ctx.drawImage(off, 0, 0, w, h);
   ctx.globalCompositeOperation = prevOp;
   ctx.globalAlpha = prevAlpha;
@@ -316,7 +323,7 @@ function render() {
   if (pattern === "noise") {
     paintNoise(ctx, cW, cH, scale, patternBlendMode, opacity);
   } else if (pattern === "dots") {
-    paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor), scale, patternBlendMode, opacity);
+    paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor, bgType === "blur"), scale, patternBlendMode, opacity);
   }
 
   // 3 — Composite image + shadow in one pass via an offscreen canvas.
