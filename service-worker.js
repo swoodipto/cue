@@ -16,9 +16,16 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        // Cache each asset individually so one failure doesn't block all
+        return Promise.allSettled(
+          ASSETS_TO_CACHE.map(url => cache.add(url))
+        );
+      })
+      .catch(() => {
+        // Installation continues even if caching fails
+      })
   );
   self.skipWaiting();
 });
@@ -45,19 +52,33 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Skip external analytics and non-GET requests
-  if (!request.url.startsWith(self.location.origin) || request.method !== 'GET') {
+  // Only handle GET requests for same origin
+  if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((response) => {
-      return response || fetch(request);
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(request).then((response) => {
+        // Return cached response if available
+        if (response) {
+          return response;
+        }
+        // Otherwise try network
+        return fetch(request).then((networkResponse) => {
+          // Cache successful responses for future offline use
+          if (networkResponse && networkResponse.status === 200) {
+            cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        });
+      });
     }).catch(() => {
-      // Offline fallback
-      if (request.destination === 'document') {
+      // Network failed and no cache — serve index.html for navigation
+      if (request.mode === 'navigate' || request.destination === 'document') {
         return caches.match('/index.html');
       }
     })
   );
 });
+

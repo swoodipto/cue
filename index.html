@@ -344,9 +344,15 @@
         <script>
           // Register service worker for offline support
           if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js').catch(() => {
-              // Service worker registration failed — app still works online
-            });
+            navigator.serviceWorker.register('service-worker.js')
+              .then(reg => {
+                console.log('✓ Service Worker registered', reg);
+              })
+              .catch(err => {
+                console.error('✗ Service Worker registration failed:', err);
+              });
+          } else {
+            console.warn('Service Workers not supported');
           }
         </script>
         <!-- Google tag (gtag.js) -->

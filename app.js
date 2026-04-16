@@ -290,8 +290,19 @@ function render() {
 
   // Display the canvas with responsive scaling so it always fits in the
   // preview window, even for very tall or wide images.
-  const previewW = Math.max(1, els.previewArea.clientWidth - 24);
-  const previewH = Math.max(1, els.previewArea.clientHeight - 24);
+  const previewStyles = window.getComputedStyle(els.previewArea);
+  const previewW = Math.max(
+    1,
+    els.previewArea.clientWidth
+      - parseFloat(previewStyles.paddingLeft || "0")
+      - parseFloat(previewStyles.paddingRight || "0")
+  );
+  const previewH = Math.max(
+    1,
+    els.previewArea.clientHeight
+      - parseFloat(previewStyles.paddingTop || "0")
+      - parseFloat(previewStyles.paddingBottom || "0")
+  );
   let displayW = cW;
   let displayH = cH;
   const displayRatio = cW / cH;
@@ -398,9 +409,9 @@ function toStorageURL(img) {
   return off.toDataURL("image/png");
 }
 
-async function setImage(dataURL) {
+async function setImage(src) {
   try {
-    const img = await loadImgElement(dataURL);
+    const img = await loadImgElement(src);
     state.image = img;
     showPreview();
     render();
@@ -412,15 +423,36 @@ async function setImage(dataURL) {
   }
 }
 
+async function loadFileAsImage(file) {
+  const objectURL = URL.createObjectURL(file);
+  try {
+    await setImage(objectURL);
+  } finally {
+    URL.revokeObjectURL(objectURL);
+  }
+}
+
+function extractImageURLFromHTML(html) {
+  if (!html) return null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const img = doc.querySelector("img");
+  if (!img) return null;
+  const src = img.getAttribute("src");
+  if (!src) return null;
+  if (src.startsWith("data:image/")) return src;
+  if (src.startsWith("http://") || src.startsWith("https://")) return src;
+  return null;
+}
+
 function handleFile(file) {
   if (!file) return;
-  if (!file.type.startsWith("image/")) {
+  if (file.type && !file.type.startsWith("image/")) {
     showToast("Please use a PNG, JPG, or WEBP image.");
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => setImage(e.target.result);
-  reader.readAsDataURL(file);
+  loadFileAsImage(file).catch(() => {
+    showToast("Could not display image.");
+  });
 }
 
 /* ── URL loading (clipboard-triggered, no dedicated input field) */
@@ -532,7 +564,8 @@ function initClipboard() {
     const items = Array.from(e.clipboardData.items);
 
     // Priority 1: raw image data (screenshot, copied image)
-    const imageItem = items.find((it) => it.type.startsWith("image/"));
+    const imageItem = items.find((it) => it.type === "image/png")
+      || items.find((it) => it.type.startsWith("image/"));
     if (imageItem) {
       e.preventDefault();
       playPasteAnimation();
@@ -540,7 +573,20 @@ function initClipboard() {
       return;
     }
 
-    // Priority 2: plain text that looks like an image URL
+    // Priority 2: HTML clipboard content containing an image source.
+    const htmlItem = items.find((it) => it.type === "text/html");
+    if (htmlItem) {
+      htmlItem.getAsString((html) => {
+        const src = extractImageURLFromHTML(html);
+        if (!src) return;
+        e.preventDefault();
+        playPasteAnimation();
+        setImage(src);
+      });
+      return;
+    }
+
+    // Priority 3: plain text that looks like an image URL
     const textItem = items.find((it) => it.type === "text/plain");
     if (textItem) {
       textItem.getAsString((text) => {
