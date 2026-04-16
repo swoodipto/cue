@@ -22,20 +22,51 @@ function getBrowserName() {
 const state = {
   image: null,        // HTMLImageElement currently displayed
   imageDataURL: null, // compressed data URL persisted to localStorage
-  settings: {
-    bgType:      "solid",   // "solid" | "blur"
-    bgColor:     "#ffffff", // solid background colour
-    blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
-    pattern:     "none",    // "none" | "noise" | "dots"
-    patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
-    patternBlendMode: "normal", // "normal" | "overlay" | "screen"
-    patternOpacity: 50,     // 1–100 ( /100 for actual opacity)
-    canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
-    padding:     60,        // px — 0–120
-    radius:      18,        // px — 0–60
-    shadow:      40,        // 0–100 intensity
-  },
+  isDemo: true,
+  imageLabel: "demo-image.png",
+  settings: null,
 };
+
+const DEFAULT_SETTINGS = {
+  bgType:      "solid",   // "solid" | "blur"
+  bgColor:     "#ffffff", // solid background colour
+  blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
+  pattern:     "none",    // "none" | "noise" | "dots"
+  patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
+  patternBlendMode: "normal", // "normal" | "overlay" | "screen"
+  patternOpacity: 50,     // 1–100 ( /100 for actual opacity)
+  canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
+  padding:     60,        // px — 0–120
+  radius:      18,        // px — 0–60
+  shadow:      40,        // 0–100 intensity
+};
+
+state.settings = { ...DEFAULT_SETTINGS };
+
+const DEMO_IMAGES = [
+  {
+    src: "./assets/demo-ios-icon.png",
+    label: "demo-ios-icon.png",
+    settings: {
+      bgColor: "#f0efeb",
+      canvasRatio: "1:1",
+      padding: 78,
+      radius: 26,
+      shadow: 28,
+    },
+  },
+  {
+    src: "./assets/demo-zettel.png",
+    label: "demo-screenshot.png",
+    settings: {
+      bgColor: "#111111",
+      canvasRatio: "free",
+      padding: 40,
+      radius: 24,
+      shadow: 24,
+    },
+  },
+];
 
 /* ── Canvas size presets ────────────────────────────────────── */
 
@@ -188,12 +219,17 @@ const els = {
   emptyState:    $("emptyState"),
   previewArea:   $("previewArea"),
   frameWrap:     $("frameWrap"),
+  frame:         document.querySelector(".frame"),
   canvas:        $("previewCanvas"),
+  canvasActions: $("canvasActions"),
+  canvasPasteBtn: $("canvasPasteBtn"),
+  canvasBrowseBtn: $("canvasBrowseBtn"),
   exportBtn:     $("exportBtn"),
   copyBtn:       $("copyBtn"),
   toast:         $("toast"),
   panel:         $("panel"),
   resetBtn:      $("resetBtn"),
+  imageLabel:    $("imageLabel"),
   sectionStyle:  $("section-style"),
   sectionExport: $("section-export"),
   // Appearance controls
@@ -409,24 +445,59 @@ function toStorageURL(img) {
   return off.toDataURL("image/png");
 }
 
-async function setImage(src) {
+function updateImageLabel(label) {
+  if (!els.imageLabel) return;
+  els.imageLabel.textContent = label || "image_mockups.png";
+}
+
+function applySettings(settings) {
+  state.settings = { ...DEFAULT_SETTINGS, ...settings };
+  applySettingsToUI();
+}
+
+function pickDemoImage() {
+  return DEMO_IMAGES[(Math.random() * DEMO_IMAGES.length) | 0];
+}
+
+async function setImage(src, options = {}) {
+  const {
+    persist = true,
+    label = null,
+    isDemo = false,
+  } = options;
+
   try {
     const img = await loadImgElement(src);
     state.image = img;
+    state.isDemo = isDemo;
+    state.imageLabel = label || "image_mockups.png";
+    updateImageLabel(state.imageLabel);
     showPreview();
     render();
-    // Compress before storing so large uploads don't exceed quota silently
-    state.imageDataURL = toStorageURL(img);
+    state.imageDataURL = persist ? toStorageURL(img) : null;
     saveSession();
   } catch {
     showToast("Could not display image.");
   }
 }
 
+async function loadDemoImage(demo = pickDemoImage()) {
+  applySettings(demo.settings);
+  await setImage(demo.src, {
+    persist: false,
+    label: demo.label,
+    isDemo: true,
+  });
+}
+
 async function loadFileAsImage(file) {
   const objectURL = URL.createObjectURL(file);
   try {
-    await setImage(objectURL);
+    await setImage(objectURL, {
+      persist: true,
+      label: file.name || "pasted-image.png",
+      isDemo: false,
+    });
   } finally {
     URL.revokeObjectURL(objectURL);
   }
@@ -455,6 +526,48 @@ function handleFile(file) {
   });
 }
 
+async function pasteFromClipboardButton() {
+  try {
+    if (navigator.clipboard?.read) {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((type) => type === "image/png")
+          || item.types.find((type) => type.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          playPasteAnimation();
+          handleFile(new File([blob], "pasted-image.png", { type: blob.type || imageType }));
+          return;
+        }
+        if (item.types.includes("text/plain")) {
+          const textBlob = await item.getType("text/plain");
+          const text = (await textBlob.text()).trim();
+          if (text.startsWith("http://") || text.startsWith("https://")) {
+            playPasteAnimation();
+            await loadFromURL(text);
+            return;
+          }
+        }
+      }
+      showToast("Clipboard does not contain an image.");
+      return;
+    }
+
+    if (navigator.clipboard?.readText) {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text.startsWith("http://") || text.startsWith("https://")) {
+        playPasteAnimation();
+        await loadFromURL(text);
+        return;
+      }
+    }
+
+    showToast("Use your browser's paste action here.");
+  } catch {
+    showToast("Paste button isn't supported in this browser.");
+  }
+}
+
 /* ── URL loading (clipboard-triggered, no dedicated input field) */
 
 async function loadFromURL(url) {
@@ -467,6 +580,9 @@ async function loadFromURL(url) {
     // For URL-loaded images, use the URL directly as the source
     // This avoids creating huge data URLs for large images
     state.image = img;
+    state.isDemo = false;
+    state.imageLabel = "linked-image.png";
+    updateImageLabel(state.imageLabel);
     showPreview();
     render();
     // Still compress for storage, but the display uses the original
@@ -488,8 +604,13 @@ function showPreview() {
   els.sectionExport.classList.remove("hidden");
 
   // Re-trigger entrance animation on each new image load
-  els.frameWrap.style.animation = "none";
-  requestAnimationFrame(() => { els.frameWrap.style.animation = ""; });
+  els.frame.classList.remove("enter-animate");
+  els.canvasActions.classList.remove("enter-animate");
+  void els.frame.offsetWidth;
+  requestAnimationFrame(() => {
+    els.frame.classList.add("enter-animate");
+    els.canvasActions.classList.add("enter-animate");
+  });
 }
 
 function playPasteAnimation() {
@@ -502,19 +623,11 @@ function playPasteAnimation() {
   }, { once: true });
 }
 
-function resetCanvas() {
+async function resetCanvas() {
   state.image        = null;
   state.imageDataURL = null;
-
-  els.frameWrap.classList.add("hidden");
-  els.emptyState.classList.remove("hidden");
-  els.panel.classList.add("hidden");
-  els.resetBtn.classList.add("hidden");
-  els.sectionStyle.classList.add("hidden");
-  els.sectionExport.classList.add("hidden");
-
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
-  saveSession();
+  await loadDemoImage();
 }
 
 /* ── Upload zone ────────────────────────────────────────────── */
@@ -528,6 +641,16 @@ function initUpload() {
   els.browseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     els.fileInput.click();
+  });
+
+  els.canvasBrowseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    els.fileInput.click();
+  });
+
+  els.canvasPasteBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await pasteFromClipboardButton();
   });
 
   els.fileInput.addEventListener("change", (e) => {
@@ -812,7 +935,7 @@ function saveSession() {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       settings:     state.settings,
-      imageDataURL: state.imageDataURL,
+      imageDataURL: state.isDemo ? null : state.imageDataURL,
     }));
   } catch { /* quota exceeded — fail silently */ }
 }
@@ -820,7 +943,7 @@ function saveSession() {
 async function restoreSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return;
+    if (!raw) return false;
     const saved = JSON.parse(raw);
     if (saved.settings) {
       // Migrate old blur pattern to new bgType
@@ -832,14 +955,20 @@ async function restoreSession() {
       if (saved.settings.bgType === "blur" && isWebkitBrowser()) {
         saved.settings.bgType = "solid";
       }
-      state.settings = { ...state.settings, ...saved.settings };
-      applySettingsToUI();
+      applySettings(saved.settings);
     }
     if (saved.imageDataURL) {
-      await setImage(saved.imageDataURL);
+      await setImage(saved.imageDataURL, {
+        persist: true,
+        label: "my-image.png",
+        isDemo: false,
+      });
+      return true;
     }
+    return false;
   } catch {
     localStorage.removeItem(SESSION_KEY); // corrupted — start fresh
+    return false;
   }
 }
 
@@ -854,7 +983,7 @@ window.addEventListener("resize", () => {
 
 /* ── Init ───────────────────────────────────────────────────── */
 
-function init() {
+async function init() {
   // Disable blur option in webkit browsers
   if (isWebkitBrowser()) {
     const blurChip = document.querySelector('.chip[data-bg-type="blur"]');
@@ -877,7 +1006,10 @@ function init() {
   initClipboard();
   initControls();
   initExport();
-  restoreSession();
+  const restored = await restoreSession();
+  if (!restored) {
+    await loadDemoImage();
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);

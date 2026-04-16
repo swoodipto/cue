@@ -24,7 +24,7 @@
             <!-- Before image → upload UI  |  After image → canvas -->
             <div class="preview-area" id="previewArea">
 
-                <!-- Empty state: upload UI (hidden when image is loaded) -->
+                <!-- Empty state: upload UI (hidden when demo/user image is loaded) -->
                 <div class="empty-state" id="emptyState">
 
                     <div class="upload-zone" id="uploadZone">
@@ -53,6 +53,13 @@
                     <div class="frame">
                         <canvas id="previewCanvas"></canvas>
                     </div>
+                    <div class="canvas-actions" id="canvasActions">
+                        <span class="canvas-actions-label">Drop or paste an image to replace this demo</span>
+                        <div class="canvas-actions-buttons">
+                            <button class="canvas-paste-btn" id="canvasPasteBtn">Paste</button>
+                            <button class="canvas-browse-btn" id="canvasBrowseBtn">Upload image</button>
+                        </div>
+                    </div>
                     <!--<p class="frame-hint">Live preview · 2× export</p>-->
                 </div>
 
@@ -66,7 +73,7 @@
                         <span class="logo-mark">ꕥ</span>
                         <span class="logo-text">Cue</span>
                     </div>
-                    <span class="header-tagline">image_mockups.png</span>
+                    <span class="header-tagline" id="imageLabel">image_mockups.png</span>
                 </section>
 
                 <!-- ── Appearance (hidden until image loaded) ─────── -->
