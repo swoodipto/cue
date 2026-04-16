@@ -3,6 +3,9 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#1a1a1a" />
+        <link rel="manifest" href="manifest.json" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%231a1a1a' width='192' height='192'/><text x='50%' y='50%' font-size='120' font-weight='bold' fill='%23ffffff' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>ꕥ</text></svg>" />
         <title>cue — image mockups</title>
         <link rel="stylesheet" href="styles.css" />
     </head>
@@ -338,6 +341,14 @@
             <div class="toast" id="toast"></div>
         </div>
         <script src="app.js"></script>
+        <script>
+          // Register service worker for offline support
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {
+              // Service worker registration failed — app still works online
+            });
+          }
+        </script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-35EQV532NY"></script>
         <script>
