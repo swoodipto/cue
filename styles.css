@@ -269,15 +269,9 @@ svg {
     font-size: 12px;
     color: var(--color-text-muted);
     line-height: 1.2;
+    white-space: nowrap;
 }
 
-.canvas-actions-buttons {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.canvas-paste-btn,
 .canvas-browse-btn {
     border: none;
     border-radius: 999px;
@@ -289,12 +283,6 @@ svg {
     white-space: nowrap;
 }
 
-.canvas-paste-btn {
-    background: #efefef;
-    color: var(--color-text);
-}
-
-.canvas-paste-btn:hover,
 .canvas-browse-btn:hover {
     opacity: 0.86;
 }
@@ -821,14 +809,9 @@ svg {
     }
 
     .canvas-actions-label {
-        font-size: 11px;
+        display: none;
     }
 
-    .canvas-actions-buttons {
-        flex-shrink: 0;
-    }
-
-    .canvas-paste-btn,
     .canvas-browse-btn {
         padding: 8px 12px;
         font-size: 11px;

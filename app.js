@@ -74,6 +74,17 @@ const DEMO_IMAGES = [
       shadow: 24,
     },
   },
+  {
+    src: "./assets/tweet.png",
+    label: "demo-tweet.png",
+    settings: {
+      bgColor: "#f0efeb",
+      canvasRatio: "4:3",
+      padding: 100,
+      radius: 10,
+      shadow: 32,
+    },
+  },
 ];
 
 const OVERLAY_SIZE_LIMITS = {
@@ -237,7 +248,6 @@ const els = {
   frame:         document.querySelector(".frame"),
   canvas:        $("previewCanvas"),
   canvasActions: $("canvasActions"),
-  canvasPasteBtn: $("canvasPasteBtn"),
   canvasBrowseBtn: $("canvasBrowseBtn"),
   exportBtn:     $("exportBtn"),
   copyBtn:       $("copyBtn"),
@@ -682,46 +692,42 @@ function handleFile(file) {
   });
 }
 
-async function pasteFromClipboardButton() {
-  try {
-    if (navigator.clipboard?.read) {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imageType = item.types.find((type) => type === "image/png")
-          || item.types.find((type) => type.startsWith("image/"));
-        if (imageType) {
-          const blob = await item.getType(imageType);
-          playPasteAnimation();
-          handleFile(new File([blob], "pasted-image.png", { type: blob.type || imageType }));
-          return;
-        }
-        if (item.types.includes("text/plain")) {
-          const textBlob = await item.getType("text/plain");
-          const text = (await textBlob.text()).trim();
-          if (text.startsWith("http://") || text.startsWith("https://")) {
-            playPasteAnimation();
-            await loadFromURL(text);
-            return;
-          }
-        }
-      }
-      showToast("Clipboard does not contain an image.");
-      return;
-    }
+function handleClipboardData(clipboardData) {
+  if (!clipboardData) return false;
+  const items = Array.from(clipboardData.items || []);
 
-    if (navigator.clipboard?.readText) {
-      const text = (await navigator.clipboard.readText()).trim();
-      if (text.startsWith("http://") || text.startsWith("https://")) {
-        playPasteAnimation();
-        await loadFromURL(text);
-        return;
-      }
-    }
-
-    showToast("Use your browser's paste action here.");
-  } catch {
-    showToast("Paste button isn't supported in this browser.");
+  const imageItem = items.find((it) => it.type === "image/png")
+    || items.find((it) => it.type.startsWith("image/"));
+  if (imageItem) {
+    playPasteAnimation();
+    handleFile(imageItem.getAsFile());
+    return true;
   }
+
+  const htmlItem = items.find((it) => it.type === "text/html");
+  if (htmlItem) {
+    htmlItem.getAsString((html) => {
+      const src = extractImageURLFromHTML(html);
+      if (!src) return;
+      playPasteAnimation();
+      setImage(src);
+    });
+    return true;
+  }
+
+  const textItem = items.find((it) => it.type === "text/plain");
+  if (textItem) {
+    textItem.getAsString((text) => {
+      const trimmed = text.trim();
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        playPasteAnimation();
+        loadFromURL(trimmed);
+      }
+    });
+    return true;
+  }
+
+  return false;
 }
 
 /* ── URL loading (clipboard-triggered, no dedicated input field) */
@@ -806,11 +812,6 @@ function initUpload() {
     els.fileInput.click();
   });
 
-  els.canvasPasteBtn.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    await pasteFromClipboardButton();
-  });
-
   els.overlayLogoBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     els.logoFileInput.click();
@@ -852,41 +853,8 @@ function initUpload() {
 
 function initClipboard() {
   document.addEventListener("paste", (e) => {
-    const items = Array.from(e.clipboardData.items);
-
-    // Priority 1: raw image data (screenshot, copied image)
-    const imageItem = items.find((it) => it.type === "image/png")
-      || items.find((it) => it.type.startsWith("image/"));
-    if (imageItem) {
+    if (handleClipboardData(e.clipboardData)) {
       e.preventDefault();
-      playPasteAnimation();
-      handleFile(imageItem.getAsFile());
-      return;
-    }
-
-    // Priority 2: HTML clipboard content containing an image source.
-    const htmlItem = items.find((it) => it.type === "text/html");
-    if (htmlItem) {
-      htmlItem.getAsString((html) => {
-        const src = extractImageURLFromHTML(html);
-        if (!src) return;
-        e.preventDefault();
-        playPasteAnimation();
-        setImage(src);
-      });
-      return;
-    }
-
-    // Priority 3: plain text that looks like an image URL
-    const textItem = items.find((it) => it.type === "text/plain");
-    if (textItem) {
-      textItem.getAsString((text) => {
-        const trimmed = text.trim();
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-          e.preventDefault();
-          loadFromURL(trimmed);
-        }
-      });
     }
   });
 }
