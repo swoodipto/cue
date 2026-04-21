@@ -1420,11 +1420,46 @@ function initUpload() {
 
 /* ── Clipboard paste (⌘V / Ctrl+V anywhere) ─────────────────── */
 
+function isMacPlatform() {
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  return /mac/i.test(platform);
+}
+
+function isEditableTarget(target) {
+  const element = target instanceof Element ? target : target?.parentElement;
+  if (!element) return false;
+  if (element.closest("input, textarea, select")) return true;
+  const editableAncestor = element.closest("[contenteditable]");
+  return editableAncestor instanceof HTMLElement ? editableAncestor.isContentEditable : false;
+}
+
+function hasActiveTextSelection() {
+  const selection = window.getSelection?.();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
+}
+
+function isCopyShortcut(event) {
+  if (event.defaultPrevented || event.isComposing || event.repeat) return false;
+  if (event.altKey || event.shiftKey) return false;
+  if (event.key.toLowerCase() !== "c") return false;
+  return isMacPlatform()
+    ? event.metaKey && !event.ctrlKey
+    : event.ctrlKey && !event.metaKey;
+}
+
 function initClipboard() {
   document.addEventListener("paste", (e) => {
     if (handleClipboardData(e.clipboardData)) {
       e.preventDefault();
     }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (!isCopyShortcut(e)) return;
+    if (!state.image || els.sectionExport.classList.contains("hidden")) return;
+    if (isEditableTarget(e.target) || hasActiveTextSelection()) return;
+    e.preventDefault();
+    els.copyBtn.click();
   });
 }
 
