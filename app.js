@@ -133,25 +133,33 @@ const soundState = {
 };
 const sliderSoundTimestamps = new WeakMap();
 
-function unlockAudioSync() {
-  if (soundState.ready || !state.settings?.soundEnabled) return;
-  setMasterVolume(SOUND_MASTER_VOLUME);
-  soundState.ready = true;
-}
-
-function unlockAudioAsync() {
+function unlockAudio() {
   if (soundState.ready) return Promise.resolve(true);
   if (!state.settings?.soundEnabled) return Promise.resolve(false);
-  unlockAudioSync();
   if (!soundState.priming) {
+    setMasterVolume(SOUND_MASTER_VOLUME);
     soundState.priming = ensureReady()
-      .then(() => true)
+      .then(() => {
+        soundState.ready = true;
+
+        // iOS can be picky even after resume; a near-silent warmup helps
+        // establish the graph once within the trusted gesture.
+        try {
+          soundState.patch.play(UI_SOUNDS.slider, { volume: 0.0001 });
+        } catch {
+          // Ignore warmup failures and rely on the next real sound.
+        }
+
+        return true;
+      })
       .catch(() => {
         soundState.ready = false;
         return false;
       })
       .finally(() => {
-        soundState.priming = null;
+        if (!soundState.ready) {
+          soundState.priming = null;
+        }
       });
   }
   return soundState.priming;
@@ -159,27 +167,40 @@ function unlockAudioAsync() {
 
 function primeAudioOnFirstGesture() {
   const handleFirstGesture = () => {
-    unlockAudioSync();
-    void unlockAudioAsync();
+    void unlockAudio();
     document.removeEventListener("pointerdown", handleFirstGesture);
     document.removeEventListener("touchstart", handleFirstGesture);
+    document.removeEventListener("touchend", handleFirstGesture);
+    document.removeEventListener("click", handleFirstGesture);
     document.removeEventListener("keydown", handleFirstGesture);
   };
 
   document.addEventListener("pointerdown", handleFirstGesture, { passive: true });
   document.addEventListener("touchstart", handleFirstGesture, { passive: true });
+  document.addEventListener("touchend", handleFirstGesture, { passive: true });
+  document.addEventListener("click", handleFirstGesture, { passive: true });
   document.addEventListener("keydown", handleFirstGesture);
 }
 
 function playSound(name, volume = 1) {
   if (!state.settings?.soundEnabled) return;
-  try {
-    unlockAudioSync();
-    soundState.patch.play(name, { volume });
-    void unlockAudioAsync();
-  } catch {
-    // Audio is additive UI polish, so failures should stay silent.
+  if (soundState.ready) {
+    try {
+      soundState.patch.play(name, { volume });
+    } catch {
+      // Audio is additive UI polish, so failures should stay silent.
+    }
+    return;
   }
+
+  void unlockAudio()
+    .then((isReady) => {
+      if (!isReady) return;
+      soundState.patch.play(name, { volume });
+    })
+    .catch(() => {
+      // Audio is additive UI polish, so failures should stay silent.
+    });
 }
 
 function playSliderTick(slider) {
@@ -1393,8 +1414,7 @@ function initUpload() {
   els.previewArea.addEventListener("drop", (e) => {
     e.preventDefault();
     els.previewArea.classList.remove("drag-over");
-    unlockAudioSync();
-    void unlockAudioAsync();
+    void unlockAudio();
     handleFile(e.dataTransfer.files[0]);
   });
 
@@ -1402,8 +1422,7 @@ function initUpload() {
   document.addEventListener("dragover", (e) => e.preventDefault());
   document.addEventListener("drop", (e) => {
     e.preventDefault();
-    unlockAudioSync();
-    void unlockAudioAsync();
+    void unlockAudio();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) handleFile(file);
   });
