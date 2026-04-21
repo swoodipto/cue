@@ -5,18 +5,6 @@
 
 "use strict";
 
-/* ── Browser detection ──────────────────────────────────────── */
-
-function isWebkitBrowser() {
-  const ua = navigator.userAgent.toLowerCase();
-  // Safari and WebKit-based browsers (but not Chrome/Edge which also have webkit in UA)
-  return /safari/.test(ua) && !/chrome|edge|opera/.test(ua);
-}
-
-function getBrowserName() {
-  return "WebKit-based browser";
-}
-
 /* ── State ──────────────────────────────────────────────────── */
 
 const state = {
@@ -27,6 +15,8 @@ const state = {
   isDemo: true,
   imageLabel: "demo-image.png",
   settings: null,
+  canvasBlurMode: "software", // "native" | "software"
+  blurCache: null,
 };
 
 const DEFAULT_SETTINGS = {
@@ -94,6 +84,9 @@ const OVERLAY_SIZE_LIMITS = {
   logo: 30,
 };
 
+const BLUR_SOFTWARE_PIXEL_BUDGET = 360000;
+const BLUR_SOFTWARE_MAX_SCALE = 8;
+
 /* ── Canvas size presets ────────────────────────────────────── */
 
 const CANVAS_PRESETS = {
@@ -140,6 +133,265 @@ function hexToRgb(hex) {
     g: parseInt(hex.slice(3, 5), 16),
     b: parseInt(hex.slice(5, 7), 16),
   };
+}
+
+function invalidateBlurCache() {
+  state.blurCache = null;
+}
+
+function drawImageCover(ctx, img, destW, destH) {
+  const imgAspect = img.naturalWidth / img.naturalHeight;
+  const destAspect = destW / destH;
+  let dW, dH;
+
+  if (imgAspect > destAspect) {
+    dH = destH;
+    dW = dH * imgAspect;
+  } else {
+    dW = destW;
+    dH = dW / imgAspect;
+  }
+
+  ctx.drawImage(img, (destW - dW) / 2, (destH - dH) / 2, dW, dH);
+}
+
+function detectNativeCanvasBlurSupport() {
+  const src = document.createElement("canvas");
+  const dst = document.createElement("canvas");
+  src.width = src.height = 8;
+  dst.width = dst.height = 8;
+
+  const sc = src.getContext("2d");
+  const dc = dst.getContext("2d", { willReadFrequently: true });
+  if (!sc || !dc || !("filter" in dc)) return false;
+
+  try {
+    sc.fillStyle = "#ffffff";
+    sc.fillRect(3, 3, 2, 2);
+
+    dc.filter = "blur(2px)";
+    if (!String(dc.filter).includes("blur")) return false;
+    dc.drawImage(src, 0, 0);
+    dc.filter = "none";
+
+    const data = dc.getImageData(0, 0, 8, 8).data;
+    const samplePixels = [
+      (2 * 8 + 2) * 4 + 3,
+      (2 * 8 + 5) * 4 + 3,
+      (5 * 8 + 2) * 4 + 3,
+      (5 * 8 + 5) * 4 + 3,
+      (1 * 8 + 3) * 4 + 3,
+      (3 * 8 + 1) * 4 + 3,
+    ];
+    return samplePixels.some((offset) => data[offset] > 0);
+  } catch {
+    return false;
+  }
+}
+
+function getSoftwareBlurScale(width, height, blurPx) {
+  const areaScale = Math.sqrt((width * height) / BLUR_SOFTWARE_PIXEL_BUDGET);
+  const blurScale = blurPx / 12;
+  return Math.max(1, Math.min(BLUR_SOFTWARE_MAX_SCALE, Math.ceil(Math.max(areaScale, blurScale))));
+}
+
+function boxBlurPass(src, dst, width, height, radius, horizontal) {
+  const windowSize = radius * 2 + 1;
+
+  if (horizontal) {
+    for (let y = 0; y < height; y++) {
+      const rowOffset = y * width * 4;
+      let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+
+      for (let i = -radius; i <= radius; i++) {
+        const x = Math.max(0, Math.min(width - 1, i));
+        const idx = rowOffset + x * 4;
+        const alpha = src[idx + 3];
+        sumR += src[idx] * alpha;
+        sumG += src[idx + 1] * alpha;
+        sumB += src[idx + 2] * alpha;
+        sumA += alpha;
+      }
+
+      for (let x = 0; x < width; x++) {
+        const idx = rowOffset + x * 4;
+        const alpha = Math.round(sumA / windowSize);
+        dst[idx + 3] = alpha;
+
+        if (sumA > 0) {
+          dst[idx]     = Math.round(sumR / sumA);
+          dst[idx + 1] = Math.round(sumG / sumA);
+          dst[idx + 2] = Math.round(sumB / sumA);
+        } else {
+          dst[idx] = 0;
+          dst[idx + 1] = 0;
+          dst[idx + 2] = 0;
+        }
+
+        const removeX = Math.max(0, x - radius);
+        const addX = Math.min(width - 1, x + radius + 1);
+        const removeIdx = rowOffset + removeX * 4;
+        const addIdx = rowOffset + addX * 4;
+        const removeAlpha = src[removeIdx + 3];
+        const addAlpha = src[addIdx + 3];
+
+        sumR += src[addIdx] * addAlpha - src[removeIdx] * removeAlpha;
+        sumG += src[addIdx + 1] * addAlpha - src[removeIdx + 1] * removeAlpha;
+        sumB += src[addIdx + 2] * addAlpha - src[removeIdx + 2] * removeAlpha;
+        sumA += addAlpha - removeAlpha;
+      }
+    }
+    return;
+  }
+
+  for (let x = 0; x < width; x++) {
+    let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+
+    for (let i = -radius; i <= radius; i++) {
+      const y = Math.max(0, Math.min(height - 1, i));
+      const idx = (y * width + x) * 4;
+      const alpha = src[idx + 3];
+      sumR += src[idx] * alpha;
+      sumG += src[idx + 1] * alpha;
+      sumB += src[idx + 2] * alpha;
+      sumA += alpha;
+    }
+
+    for (let y = 0; y < height; y++) {
+      const idx = (y * width + x) * 4;
+      const alpha = Math.round(sumA / windowSize);
+      dst[idx + 3] = alpha;
+
+      if (sumA > 0) {
+        dst[idx]     = Math.round(sumR / sumA);
+        dst[idx + 1] = Math.round(sumG / sumA);
+        dst[idx + 2] = Math.round(sumB / sumA);
+      } else {
+        dst[idx] = 0;
+        dst[idx + 1] = 0;
+        dst[idx + 2] = 0;
+      }
+
+      const removeY = Math.max(0, y - radius);
+      const addY = Math.min(height - 1, y + radius + 1);
+      const removeIdx = (removeY * width + x) * 4;
+      const addIdx = (addY * width + x) * 4;
+      const removeAlpha = src[removeIdx + 3];
+      const addAlpha = src[addIdx + 3];
+
+      sumR += src[addIdx] * addAlpha - src[removeIdx] * removeAlpha;
+      sumG += src[addIdx + 1] * addAlpha - src[removeIdx + 1] * removeAlpha;
+      sumB += src[addIdx + 2] * addAlpha - src[removeIdx + 2] * removeAlpha;
+      sumA += addAlpha - removeAlpha;
+    }
+  }
+}
+
+function applySoftwareBlurToCanvas(canvas, blurPx) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const scale = getSoftwareBlurScale(width, height, blurPx);
+  const sampleW = Math.max(1, Math.ceil(width / scale));
+  const sampleH = Math.max(1, Math.ceil(height / scale));
+  const sample = document.createElement("canvas");
+  sample.width = sampleW;
+  sample.height = sampleH;
+
+  const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
+  if (!sampleCtx) return canvas;
+
+  sampleCtx.imageSmoothingEnabled = true;
+  sampleCtx.imageSmoothingQuality = "high";
+  sampleCtx.drawImage(canvas, 0, 0, sampleW, sampleH);
+
+  const imageData = sampleCtx.getImageData(0, 0, sampleW, sampleH);
+  const radius = Math.max(1, Math.round(blurPx / scale));
+  let src = new Uint8ClampedArray(imageData.data);
+  let dst = new Uint8ClampedArray(src.length);
+
+  for (let pass = 0; pass < 3; pass++) {
+    boxBlurPass(src, dst, sampleW, sampleH, radius, true);
+    boxBlurPass(dst, src, sampleW, sampleH, radius, false);
+  }
+
+  imageData.data.set(src);
+  sampleCtx.putImageData(imageData, 0, 0);
+
+  const blurred = document.createElement("canvas");
+  blurred.width = width;
+  blurred.height = height;
+  const bc = blurred.getContext("2d");
+  if (!bc) return canvas;
+  bc.imageSmoothingEnabled = true;
+  bc.imageSmoothingQuality = "high";
+  bc.drawImage(sample, 0, 0, width, height);
+  return blurred;
+}
+
+function createBlurredBackgroundSurface(img, cW, cH, blurPx) {
+  const pad = Math.ceil(blurPx * 3);
+  const width = cW + pad * 2;
+  const height = cH + pad * 2;
+  const base = document.createElement("canvas");
+  base.width = width;
+  base.height = height;
+
+  const baseCtx = base.getContext("2d");
+  if (!baseCtx) {
+    return { canvas: base, method: "software", pad };
+  }
+
+  drawImageCover(baseCtx, img, width, height);
+
+  if (state.canvasBlurMode === "native") {
+    try {
+      const blurred = document.createElement("canvas");
+      blurred.width = width;
+      blurred.height = height;
+      const bc = blurred.getContext("2d");
+      if (bc) {
+        bc.filter = `blur(${blurPx}px)`;
+        bc.drawImage(base, 0, 0);
+        bc.filter = "none";
+        return { canvas: blurred, method: "native", pad };
+      }
+    } catch {
+      state.canvasBlurMode = "software";
+      invalidateBlurCache();
+    }
+  }
+
+  return {
+    canvas: applySoftwareBlurToCanvas(base, blurPx),
+    method: "software",
+    pad,
+  };
+}
+
+function getBlurredBackgroundSurface(img, cW, cH, blurPx) {
+  const cached = state.blurCache;
+  if (
+    cached &&
+    cached.image === img &&
+    cached.width === cW &&
+    cached.height === cH &&
+    cached.blur === blurPx &&
+    cached.method === state.canvasBlurMode
+  ) {
+    return cached;
+  }
+
+  const next = createBlurredBackgroundSurface(img, cW, cH, blurPx);
+  state.blurCache = {
+    image: img,
+    width: cW,
+    height: cH,
+    blur: blurPx,
+    method: next.method,
+    pad: next.pad,
+    canvas: next.canvas,
+  };
+  return state.blurCache;
 }
 
 /**
@@ -202,38 +454,8 @@ function paintDotGrid(ctx, w, h, dotColor, scale = 1, blendMode = "overlay", opa
  * kernel never bleeds to transparency at the edges.
  */
 function paintBlurredBackground(ctx, img, cW, cH, blurPx) {
-  const pad = Math.ceil(blurPx * 3); // enough margin so edge-fade is invisible
-
-  // 1 — Draw the image (cover-scaled) onto a padded offscreen canvas
-  const off = document.createElement("canvas");
-  off.width  = cW + pad * 2;
-  off.height = cH + pad * 2;
-  const oc = off.getContext("2d");
-
-  const imgAspect = img.naturalWidth / img.naturalHeight;
-  const offAspect = off.width / off.height;
-  let dW, dH;
-  if (imgAspect > offAspect) {
-    dH = off.height;
-    dW = dH * imgAspect;
-  } else {
-    dW = off.width;
-    dH = dW / imgAspect;
-  }
-  oc.drawImage(img, (off.width - dW) / 2, (off.height - dH) / 2, dW, dH);
-
-  // 2 — Blur onto a second offscreen (filter on drawImage blurs the source pixels)
-  const blurred = document.createElement("canvas");
-  blurred.width  = off.width;
-  blurred.height = off.height;
-  const bc = blurred.getContext("2d");
-  bc.filter = `blur(${blurPx}px)`;
-  bc.drawImage(off, 0, 0);
-  bc.filter = "none";
-
-  // 3 — Stamp only the centre (non-faded) region onto the main canvas.
-  //     ctx is inside scale(SCALE,SCALE) so the 1× source is upscaled correctly.
-  ctx.drawImage(blurred, pad, pad, cW, cH, 0, 0, cW, cH);
+  const surface = getBlurredBackgroundSurface(img, cW, cH, blurPx);
+  ctx.drawImage(surface.canvas, surface.pad, surface.pad, cW, cH, 0, 0, cW, cH);
 }
 
 /* ── DOM refs ───────────────────────────────────────────────── */
@@ -602,6 +824,7 @@ function updateOverlayUI() {
 
 function applySettings(settings) {
   state.settings = { ...DEFAULT_SETTINGS, ...settings };
+  invalidateBlurCache();
   applySettingsToUI();
 }
 
@@ -619,6 +842,7 @@ async function setImage(src, options = {}) {
   try {
     const img = await loadImgElement(src);
     state.image = img;
+    invalidateBlurCache();
     state.isDemo = isDemo;
     state.imageLabel = label || "image_mockups.png";
     updateImageLabel(state.imageLabel);
@@ -754,6 +978,7 @@ async function loadFromURL(url) {
     // For URL-loaded images, use the URL directly as the source
     // This avoids creating huge data URLs for large images
     state.image = img;
+    invalidateBlurCache();
     state.isDemo = false;
     state.imageLabel = "linked-image.png";
     updateImageLabel(state.imageLabel);
@@ -800,6 +1025,7 @@ async function resetCanvas() {
   state.imageDataURL = null;
   state.logoImage    = null;
   state.logoDataURL  = null;
+  invalidateBlurCache();
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   await loadDemoImage();
 }
@@ -911,12 +1137,6 @@ function initControls() {
   els.bgTypePicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-bg-type]");
     if (!chip) return;
-
-    // Check if trying to select blur on webkit browser
-    if (chip.dataset.bgType === "blur" && isWebkitBrowser()) {
-      showToast(`Blur isn't supported in ${getBrowserName()}, please use Chrome or Firefox based browsers.`);
-      return;
-    }
 
     els.bgTypePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
@@ -1146,10 +1366,6 @@ async function restoreSession() {
         saved.settings.bgType = "blur";
         saved.settings.pattern = "none";
       }
-      // Disable blur in webkit browsers
-      if (saved.settings.bgType === "blur" && isWebkitBrowser()) {
-        saved.settings.bgType = "solid";
-      }
       applySettings(saved.settings);
     }
     if (saved.imageDataURL) {
@@ -1185,15 +1401,8 @@ window.addEventListener("resize", () => {
 /* ── Init ───────────────────────────────────────────────────── */
 
 async function init() {
-  // Disable blur option in webkit browsers
-  if (isWebkitBrowser()) {
-    const blurChip = document.querySelector('.chip[data-bg-type="blur"]');
-    if (blurChip) {
-      blurChip.style.opacity = "0.5";
-      blurChip.style.cursor = "not-allowed";
-      blurChip.title = `Blur isn't supported in ${getBrowserName()}, please use Chrome or Firefox based browsers.`;
-    }
-  }
+  state.canvasBlurMode = detectNativeCanvasBlurSupport() ? "native" : "software";
+  invalidateBlurCache();
 
   // Initialise slider track fills from their default HTML values
   refreshSlider(els.paddingSlider);
