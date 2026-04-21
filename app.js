@@ -26,8 +26,11 @@ function prefersReducedMotion() {
 }
 
 const DEFAULT_SETTINGS = {
-  bgType:      "solid",   // "solid" | "blur"
+  bgType:      "solid",   // "solid" | "gradient" | "blur"
   bgColor:     "#ffffff", // solid background colour
+  bgGradientStartColor: "#d8e5f2",
+  bgGradientEndColor: "#f7d8c3",
+  bgGradientDirection: "to-bottom-right",
   blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
   pattern:     "none",    // "none" | "noise" | "dots" | "grid"
   patternColor: adaptivePatternColor("#ffffff"),
@@ -77,11 +80,11 @@ const DEMO_IMAGES = [
     src: "./assets/tweet.png",
     label: "demo-tweet.png",
     settings: {
-      bgColor: "#f0efeb",
+      bgColor: "#79BC1C",
       canvasRatio: "4:3",
       padding: 100,
       radius: 10,
-      shadow: 32,
+      shadow: 100,
     },
   },
 ];
@@ -204,7 +207,7 @@ function computeShadow(intensity, spread = 0) {
   if (intensity <= 0) return null;
   const t = intensity / 100;
   return {
-    color:   `rgba(0,0,0,${(t * 0.2).toFixed(3)})`,
+    color:   `rgba(0,0,0,${(t * 0.25).toFixed(3)})`,
     blur:    t * 75,
     offsetY: t * 30,
     spread:  spread,
@@ -328,6 +331,53 @@ function hexToRgb(hex) {
     g: parseInt(hex.slice(3, 5), 16),
     b: parseInt(hex.slice(5, 7), 16),
   };
+}
+
+function rgbToHex(r, g, b) {
+  const toHex = (value) => Math.max(0, Math.min(255, Math.round(value)))
+    .toString(16)
+    .padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function mixHexColors(colorA, colorB, weight = 0.5) {
+  const a = hexToRgb(colorA);
+  const b = hexToRgb(colorB);
+  const t = Math.max(0, Math.min(1, weight));
+  return rgbToHex(
+    a.r + (b.r - a.r) * t,
+    a.g + (b.g - a.g) * t,
+    a.b + (b.b - a.b) * t
+  );
+}
+
+function getBackgroundReferenceColor(settings) {
+  if (settings.bgType === "gradient") {
+    return mixHexColors(settings.bgGradientStartColor, settings.bgGradientEndColor);
+  }
+  return settings.bgColor;
+}
+
+function getGradientEndpoints(direction, width, height) {
+  switch (direction) {
+    case "to-top":
+      return [width / 2, height, width / 2, 0];
+    case "to-top-right":
+      return [0, height, width, 0];
+    case "to-right":
+      return [0, height / 2, width, height / 2];
+    case "to-bottom":
+      return [width / 2, 0, width / 2, height];
+    case "to-bottom-left":
+      return [width, 0, 0, height];
+    case "to-left":
+      return [width, height / 2, 0, height / 2];
+    case "to-top-left":
+      return [width, height, 0, 0];
+    case "to-bottom-right":
+    default:
+      return [0, 0, width, height];
+  }
 }
 
 function invalidateBlurCache() {
@@ -693,6 +743,15 @@ function paintBlurredBackground(ctx, img, cW, cH, blurPx) {
   ctx.drawImage(surface.canvas, surface.pad, surface.pad, cW, cH, 0, 0, cW, cH);
 }
 
+function paintGradientBackground(ctx, cW, cH, startColor, endColor, direction) {
+  const [x0, y0, x1, y1] = getGradientEndpoints(direction, cW, cH);
+  const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+  gradient.addColorStop(0, startColor);
+  gradient.addColorStop(1, endColor);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cW, cH);
+}
+
 /* ── DOM refs ───────────────────────────────────────────────── */
 
 const $ = (id) => document.getElementById(id);
@@ -720,6 +779,11 @@ const els = {
   bgTypePicker:  $("bgTypePicker"),
   bgColorInput:  $("bgColorInput"),
   bgColorControl: $("bgColorControl"),
+  bgGradientControl: $("bgGradientControl"),
+  bgGradientStartInput: $("bgGradientStartInput"),
+  bgGradientEndInput: $("bgGradientEndInput"),
+  bgGradientDirectionControl: $("bgGradientDirectionControl"),
+  bgGradientDirectionPicker: $("bgGradientDirectionPicker"),
   bgBlurControl:  $("bgBlurControl"),
   patternPicker: $("patternPicker"),
   patternColorControl: $("patternColorControl"),
@@ -774,6 +838,9 @@ function render() {
   const {
     bgType,
     bgColor,
+    bgGradientStartColor,
+    bgGradientEndColor,
+    bgGradientDirection,
     blurAmount,
     pattern,
     patternColor,
@@ -783,7 +850,8 @@ function render() {
   } = state.settings;
   const scale = patternScale / 10;
   const opacity = patternOpacity / 100;
-  const resolvedPatternColor = patternColor || adaptivePatternColor(bgColor, bgType === "blur");
+  const resolvedPatternColor = patternColor
+    || adaptivePatternColor(getBackgroundReferenceColor(state.settings), bgType === "blur");
 
   const imgW   = img.naturalWidth;
   const imgH   = img.naturalHeight;
@@ -873,6 +941,15 @@ function render() {
   if (bgType === "solid") {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, cW, cH);
+  } else if (bgType === "gradient") {
+    paintGradientBackground(
+      ctx,
+      cW,
+      cH,
+      bgGradientStartColor,
+      bgGradientEndColor,
+      bgGradientDirection
+    );
   } else if (bgType === "blur") {
     paintBlurredBackground(ctx, img, cW, cH, blurAmount);
   }
@@ -1055,6 +1132,14 @@ function updateOverlayUI() {
     ? "Logo ready for export."
     : "No logo selected.";
   syncOverlaySizeBounds();
+}
+
+function updateBackgroundUI() {
+  const { bgType } = state.settings;
+  els.bgColorControl.classList.toggle("hidden", bgType !== "solid");
+  els.bgGradientControl.classList.toggle("hidden", bgType !== "gradient");
+  els.bgGradientDirectionControl.classList.toggle("hidden", bgType !== "gradient");
+  els.bgBlurControl.classList.toggle("hidden", bgType !== "blur");
 }
 
 function applySettings(settings) {
@@ -1405,8 +1490,7 @@ function initControls() {
     els.bgTypePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.bgType = chip.dataset.bgType;
-    els.bgColorControl.classList.toggle("hidden", chip.dataset.bgType !== "solid");
-    els.bgBlurControl.classList.toggle("hidden", chip.dataset.bgType !== "blur");
+    updateBackgroundUI();
     render();
     saveSession();
     playSound(UI_SOUNDS.chip, 0.78);
@@ -1417,6 +1501,29 @@ function initControls() {
     state.settings.bgColor = els.bgColorInput.value;
     render();
     saveSession();
+  });
+
+  els.bgGradientStartInput.addEventListener("input", () => {
+    state.settings.bgGradientStartColor = els.bgGradientStartInput.value;
+    render();
+    saveSession();
+  });
+
+  els.bgGradientEndInput.addEventListener("input", () => {
+    state.settings.bgGradientEndColor = els.bgGradientEndInput.value;
+    render();
+    saveSession();
+  });
+
+  els.bgGradientDirectionPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-gradient-direction]");
+    if (!chip) return;
+    if (state.settings.bgGradientDirection === chip.dataset.gradientDirection) return;
+    syncChipPicker(els.bgGradientDirectionPicker, "gradientDirection", chip.dataset.gradientDirection);
+    state.settings.bgGradientDirection = chip.dataset.gradientDirection;
+    render();
+    saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   els.patternColorInput.addEventListener("input", () => {
@@ -1530,23 +1637,27 @@ function initControls() {
 /** Push saved settings back into every UI control after session restore. */
 function applySettingsToUI() {
   const {
-    bgType, bgColor, pattern, canvasRatio, padding, radius, shadow,
+    bgType, bgColor, bgGradientStartColor, bgGradientEndColor, bgGradientDirection,
+    pattern, canvasRatio, padding, radius, shadow,
     blurAmount, patternColor, patternScale, patternBlendMode, patternOpacity,
     overlayType, overlayText, overlayColor, overlaySize, overlayOpacity, overlayPosition,
     soundEnabled,
   } = state.settings;
 
   els.bgColorInput.value = bgColor;
-  els.patternColorInput.value = patternColor || adaptivePatternColor(bgColor, bgType === "blur");
+  els.bgGradientStartInput.value = bgGradientStartColor;
+  els.bgGradientEndInput.value = bgGradientEndColor;
+  els.patternColorInput.value = patternColor
+    || adaptivePatternColor(getBackgroundReferenceColor(state.settings), bgType === "blur");
 
   syncChipPicker(els.bgTypePicker,  "bg-type", bgType);
   syncChipPicker(els.ratioPicker,    "ratio",   canvasRatio);
   syncChipPicker(els.patternPicker,  "pattern", pattern);
+  syncChipPicker(els.bgGradientDirectionPicker, "gradientDirection", bgGradientDirection);
   syncChipPicker(els.soundPicker, "sound", soundEnabled ? "on" : "off");
 
   // Show controls based on selections
-  els.bgColorControl.classList.toggle("hidden", bgType !== "solid");
-  els.bgBlurControl.classList.toggle("hidden", bgType !== "blur");
+  updateBackgroundUI();
   const hasPattern = pattern !== "none";
   els.patternColorControl.classList.toggle("hidden", !hasPattern);
   els.patternScaleControl.classList.toggle("hidden", !hasPattern);

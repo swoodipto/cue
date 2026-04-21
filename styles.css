@@ -397,6 +397,18 @@ svg {
     gap: 6px;
 }
 
+#bgGradientDirectionPicker {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+#bgGradientDirectionPicker .chip {
+    width: 100%;
+    padding-inline: 0;
+    text-align: center;
+}
+
 /* Individual chip button — rectangular rounded, not pill-shaped */
 .chip {
     padding: 7px 14px;
@@ -820,6 +832,11 @@ svg {
     .chip-row {
         flex-wrap: nowrap;
         overflow: hidden;
+    }
+
+    #bgGradientDirectionPicker {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: visible;
     }
 
     .chip {

@@ -71,11 +71,12 @@
                         </div>
                     </div>
 
-                    <!-- Background type + colour/blur -->
+                    <!-- Background type + colour / gradient / blur -->
                     <div class="control-group">
                         <span class="control-label">Background</span>
                         <div class="chip-row" id="bgTypePicker">
                             <button class="chip active" data-bg-type="solid">Solid</button>
+                            <button class="chip" data-bg-type="gradient">Gradient</button>
                             <button class="chip" data-bg-type="blur">Blur</button>
                         </div>
                     </div>
@@ -91,6 +92,45 @@
                                 value="#ffffff"
                                 title="Pick background color"
                             />
+                        </div>
+                    </div>
+
+                    <!-- Gradient colours (only shown when gradient background) -->
+                    <div class="control-group hidden" id="bgGradientControl">
+                        <div class="control-row">
+                            <span class="control-label">Start color</span>
+                            <input
+                                type="color"
+                                id="bgGradientStartInput"
+                                class="color-swatch"
+                                value="#d8e5f2"
+                                title="Pick gradient start color"
+                            />
+                        </div>
+                        <div class="control-row">
+                            <span class="control-label">End color</span>
+                            <input
+                                type="color"
+                                id="bgGradientEndInput"
+                                class="color-swatch"
+                                value="#f7d8c3"
+                                title="Pick gradient end color"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Gradient direction (only shown when gradient background) -->
+                    <div class="control-group hidden" id="bgGradientDirectionControl">
+                        <span class="control-label">Direction</span>
+                        <div class="chip-row direction-chip-row" id="bgGradientDirectionPicker">
+                            <button class="chip" data-gradient-direction="to-top" title="To top">&uarr;</button>
+                            <button class="chip" data-gradient-direction="to-top-right" title="To top right">&nearr;</button>
+                            <button class="chip" data-gradient-direction="to-right" title="To right">&rarr;</button>
+                            <button class="chip active" data-gradient-direction="to-bottom-right" title="To bottom right">&searr;</button>
+                            <button class="chip" data-gradient-direction="to-bottom" title="To bottom">&darr;</button>
+                            <button class="chip" data-gradient-direction="to-bottom-left" title="To bottom left">&swarr;</button>
+                            <button class="chip" data-gradient-direction="to-left" title="To left">&larr;</button>
+                            <button class="chip" data-gradient-direction="to-top-left" title="To top left">&nwarr;</button>
                         </div>
                     </div>
 
