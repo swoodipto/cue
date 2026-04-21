@@ -1,4 +1,5 @@
-import { ensureReady, loadPatch, setMasterVolume } from "./vendor/web-kits-audio.js";
+import { definePatch, ensureReady, setMasterVolume } from "./vendor/web-kits-audio.js";
+import minimalPatch from "./patches/minimal-patch.js";
 
 /* ============================================================
    CUE — app.js
@@ -110,7 +111,6 @@ const CANVAS_PRESETS = {
 
 /* ── Audio feedback ─────────────────────────────────────────── */
 
-const SOUND_PATCH_URL = "./patches/minimal.json";
 const SOUND_MASTER_VOLUME = 1;
 const SLIDER_SOUND_INTERVAL_MS = 60;
 
@@ -127,44 +127,31 @@ const UI_SOUNDS = {
 };
 
 const soundState = {
-  patch: null,
-  patchPromise: null,
+  patch: definePatch(minimalPatch),
   priming: null,
   ready: false,
 };
 const sliderSoundTimestamps = new WeakMap();
 
-function warmSoundPatch() {
-  if (soundState.patch) return Promise.resolve(soundState.patch);
-  if (!soundState.patchPromise) {
-    soundState.patchPromise = loadPatch(SOUND_PATCH_URL)
-      .then((patch) => {
-        soundState.patch = patch;
-        return patch;
-      })
-      .catch(() => {
-        soundState.patchPromise = null;
-        return null;
-      });
-  }
-  return soundState.patchPromise;
+function unlockAudioSync() {
+  if (soundState.ready || !state.settings?.soundEnabled) return;
+  setMasterVolume(SOUND_MASTER_VOLUME);
+  soundState.ready = true;
 }
 
-function unlockAudio() {
+function unlockAudioAsync() {
   if (soundState.ready) return Promise.resolve(true);
   if (!state.settings?.soundEnabled) return Promise.resolve(false);
+  unlockAudioSync();
   if (!soundState.priming) {
     soundState.priming = ensureReady()
-      .then(() => {
-        setMasterVolume(SOUND_MASTER_VOLUME);
-        soundState.ready = true;
-        return true;
+      .then(() => true)
+      .catch(() => {
+        soundState.ready = false;
+        return false;
       })
-      .catch(() => false)
       .finally(() => {
-        if (!soundState.ready) {
-          soundState.priming = null;
-        }
+        soundState.priming = null;
       });
   }
   return soundState.priming;
@@ -172,25 +159,27 @@ function unlockAudio() {
 
 function primeAudioOnFirstGesture() {
   const handleFirstGesture = () => {
-    void unlockAudio();
+    unlockAudioSync();
+    void unlockAudioAsync();
     document.removeEventListener("pointerdown", handleFirstGesture);
+    document.removeEventListener("touchstart", handleFirstGesture);
     document.removeEventListener("keydown", handleFirstGesture);
   };
 
   document.addEventListener("pointerdown", handleFirstGesture, { passive: true });
+  document.addEventListener("touchstart", handleFirstGesture, { passive: true });
   document.addEventListener("keydown", handleFirstGesture);
 }
 
 function playSound(name, volume = 1) {
   if (!state.settings?.soundEnabled) return;
-  void Promise.all([unlockAudio(), warmSoundPatch()])
-    .then(([isReady, patch]) => {
-      if (!isReady || !patch) return;
-      patch.play(name, { volume });
-    })
-    .catch(() => {
-      // Audio is additive UI polish, so failures should stay silent.
-    });
+  try {
+    unlockAudioSync();
+    soundState.patch.play(name, { volume });
+    void unlockAudioAsync();
+  } catch {
+    // Audio is additive UI polish, so failures should stay silent.
+  }
 }
 
 function playSliderTick(slider) {
@@ -1404,7 +1393,8 @@ function initUpload() {
   els.previewArea.addEventListener("drop", (e) => {
     e.preventDefault();
     els.previewArea.classList.remove("drag-over");
-    void unlockAudio();
+    unlockAudioSync();
+    void unlockAudioAsync();
     handleFile(e.dataTransfer.files[0]);
   });
 
@@ -1412,7 +1402,8 @@ function initUpload() {
   document.addEventListener("dragover", (e) => e.preventDefault());
   document.addEventListener("drop", (e) => {
     e.preventDefault();
-    void unlockAudio();
+    unlockAudioSync();
+    void unlockAudioAsync();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) handleFile(file);
   });
@@ -1906,7 +1897,6 @@ async function init() {
   state.canvasBlurMode = detectNativeCanvasBlurSupport() ? "native" : "software";
   invalidateBlurCache();
   primeAudioOnFirstGesture();
-  void warmSoundPatch();
 
   // Initialise slider track fills from their default HTML values
   refreshSlider(els.paddingSlider);
