@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS = {
   bgType:      "solid",   // "solid" | "blur"
   bgColor:     "#ffffff", // solid background colour
   blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
-  pattern:     "none",    // "none" | "noise" | "dots"
+  pattern:     "none",    // "none" | "noise" | "dots" | "grid"
   patternColor: adaptivePatternColor("#ffffff"),
   patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
   patternBlendMode: "normal", // "normal" | "overlay" | "screen"
@@ -424,6 +424,11 @@ function paintNoise(ctx, w, h, color, scale = 1, blendMode = "overlay", opacity 
   ctx.globalAlpha = prevAlpha;
 }
 
+function getCenteredPatternOffset(size, spacing) {
+  const center = size / 2;
+  return ((center % spacing) + spacing) % spacing;
+}
+
 /**
  * Dot grid: evenly-spaced small circles whose colour is computed from
  * adaptivePatternColor so they always complement the background.
@@ -431,19 +436,54 @@ function paintNoise(ctx, w, h, color, scale = 1, blendMode = "overlay", opacity 
 function paintDotGrid(ctx, w, h, dotColor, scale = 1, blendMode = "overlay", opacity = 1) {
   const spacing = 20 * scale;
   const radius  = 1.4 * scale;
+  const xOffset = getCenteredPatternOffset(w, spacing);
+  const yOffset = getCenteredPatternOffset(h, spacing);
   const prevOp    = ctx.globalCompositeOperation;
   const prevAlpha = ctx.globalAlpha;
   ctx.globalCompositeOperation = blendMode;
   ctx.globalAlpha = opacity;
   ctx.fillStyle = dotColor;
   ctx.beginPath();
-  for (let x = spacing / 2; x < w; x += spacing) {
-    for (let y = spacing / 2; y < h; y += spacing) {
+  for (let x = xOffset; x <= w; x += spacing) {
+    for (let y = yOffset; y <= h; y += spacing) {
       ctx.moveTo(x + radius, y);
       ctx.arc(x, y, radius, 0, Math.PI * 2);
     }
   }
   ctx.fill();
+  ctx.globalCompositeOperation = prevOp;
+  ctx.globalAlpha = prevAlpha;
+}
+
+/**
+ * Grid: light line work that adds structure without overpowering the image.
+ * The scale control expands or tightens the spacing while keeping lines thin.
+ */
+function paintGrid(ctx, w, h, lineColor, scale = 1, blendMode = "overlay", opacity = 1) {
+  const spacing = Math.max(12, 24 * scale);
+  const lineWidth = Math.max(0.5, Math.min(2, scale * 0.8));
+  const xOffset = getCenteredPatternOffset(w, spacing);
+  const yOffset = getCenteredPatternOffset(h, spacing);
+  const prevOp = ctx.globalCompositeOperation;
+  const prevAlpha = ctx.globalAlpha;
+
+  ctx.globalCompositeOperation = blendMode;
+  ctx.globalAlpha = opacity;
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+
+  for (let x = xOffset; x <= w; x += spacing) {
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+  }
+
+  for (let y = yOffset; y <= h; y += spacing) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+  }
+
+  ctx.stroke();
   ctx.globalCompositeOperation = prevOp;
   ctx.globalAlpha = prevAlpha;
 }
@@ -645,6 +685,8 @@ function render() {
     paintNoise(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   } else if (pattern === "dots") {
     paintDotGrid(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
+  } else if (pattern === "grid") {
+    paintGrid(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   }
 
   // 3 — Composite image + shadow in one pass via an offscreen canvas.
@@ -1160,7 +1202,7 @@ function initControls() {
     saveSession();
   });
 
-  // Pattern picker (none / noise / dots)
+  // Pattern picker (none / noise / dots / grid)
   els.patternPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-pattern]");
     if (!chip) return;
