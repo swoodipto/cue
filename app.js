@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
   bgColor:     "#ffffff", // solid background colour
   blurAmount:  20,        // px — 4–80 (used when bgType === "blur")
   pattern:     "none",    // "none" | "noise" | "dots"
+  patternColor: adaptivePatternColor("#ffffff"),
   patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
   patternBlendMode: "normal", // "normal" | "overlay" | "screen"
   patternOpacity: 50,     // 1–100 ( /100 for actual opacity)
@@ -118,45 +119,47 @@ function computeShadow(intensity) {
 /* ── Pattern helpers ────────────────────────────────────────── */
 
 /**
- * Return a semi-transparent colour that contrasts with the background —
- * dark on light backgrounds, light on dark ones.
- * Both noise and dots use this so the pattern always blends.
- * For blur backgrounds, use forBlur=true to get stronger contrast.
+ * Return a contrast-friendly hex colour for pattern controls.
  */
 function adaptivePatternColor(hexBg, forBlur = false) {
-  if (!hexBg || hexBg.length < 7) return "rgba(0,0,0,0.2)";
+  if (!hexBg || hexBg.length < 7) return "#000000";
   const r   = parseInt(hexBg.slice(1, 3), 16) / 255;
   const g   = parseInt(hexBg.slice(3, 5), 16) / 255;
   const b   = parseInt(hexBg.slice(5, 7), 16) / 255;
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-  // For blur backgrounds, use stronger opacity since the blurred content
-  // can be variable. For solid backgrounds, use full opacity.
   if (forBlur) {
-    return lum > 0.5
-      ? `rgba(0,0,0,1.0)`
-      : `rgba(255,255,255,1.0)`;
+    return lum > 0.5 ? "#000000" : "#ffffff";
   }
-  return lum > 0.5
-    ? `rgba(0,0,0,1.0)`
-    : `rgba(255,255,255,1.0)`;
+  return lum > 0.5 ? "#000000" : "#ffffff";
+}
+
+function hexToRgb(hex) {
+  if (!hex || hex.length < 7) return { r: 0, g: 0, b: 0 };
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  };
 }
 
 /**
- * Noise: rendered on an offscreen canvas then composited with "overlay"
- * so it automatically picks up the hue of whatever colour is underneath.
- * drawImage (unlike putImageData) respects the current transform, so the
- * logical w×h fills the full 2× physical canvas correctly.
+ * Noise: rendered on an offscreen canvas and tinted with the chosen colour.
+ * Each pixel keeps a randomized alpha value so the result still reads as
+ * texture rather than a flat wash.
  */
-function paintNoise(ctx, w, h, scale = 1, blendMode = "overlay", opacity = 1) {
+function paintNoise(ctx, w, h, color, scale = 1, blendMode = "overlay", opacity = 1) {
   const off = document.createElement("canvas");
   off.width  = w;
   off.height = h;
   const oc = off.getContext("2d");
   const d  = oc.createImageData(w, h);
+  const { r, g, b } = hexToRgb(color);
   for (let i = 0; i < d.data.length; i += 4) {
     const v = Math.random() * 255 | 0;
-    d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
-    d.data[i + 3] = 255; // fully opaque — overlay handles the tint
+    d.data[i] = r;
+    d.data[i + 1] = g;
+    d.data[i + 2] = b;
+    d.data[i + 3] = v;
   }
   oc.putImageData(d, 0, 0);
 
@@ -261,6 +264,8 @@ const els = {
   bgColorControl: $("bgColorControl"),
   bgBlurControl:  $("bgBlurControl"),
   patternPicker: $("patternPicker"),
+  patternColorControl: $("patternColorControl"),
+  patternColorInput: $("patternColorInput"),
   patternScaleControl: $("patternScaleControl"),
   patternScaleSlider: $("patternScaleSlider"),
   patternScaleVal: $("patternScaleVal"),
@@ -307,9 +312,19 @@ function render() {
   const img     = state.image;
   const pad     = state.settings.padding;
   const r       = state.settings.radius;
-  const { bgType, bgColor, blurAmount, pattern, patternScale, patternBlendMode, patternOpacity } = state.settings;
+  const {
+    bgType,
+    bgColor,
+    blurAmount,
+    pattern,
+    patternColor,
+    patternScale,
+    patternBlendMode,
+    patternOpacity,
+  } = state.settings;
   const scale = patternScale / 10;
   const opacity = patternOpacity / 100;
+  const resolvedPatternColor = patternColor || adaptivePatternColor(bgColor, bgType === "blur");
 
   const imgW   = img.naturalWidth;
   const imgH   = img.naturalHeight;
@@ -405,9 +420,9 @@ function render() {
 
   // 2 — Optional pattern (background-only)
   if (pattern === "noise") {
-    paintNoise(ctx, cW, cH, scale, patternBlendMode, opacity);
+    paintNoise(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   } else if (pattern === "dots") {
-    paintDotGrid(ctx, cW, cH, adaptivePatternColor(bgColor, bgType === "blur"), scale, patternBlendMode, opacity);
+    paintDotGrid(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   }
 
   // 3 — Composite image + shadow in one pass via an offscreen canvas.
@@ -919,6 +934,12 @@ function initControls() {
     saveSession();
   });
 
+  els.patternColorInput.addEventListener("input", () => {
+    state.settings.patternColor = els.patternColorInput.value;
+    render();
+    saveSession();
+  });
+
   // Pattern picker (none / noise / dots)
   els.patternPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-pattern]");
@@ -927,6 +948,7 @@ function initControls() {
     chip.classList.add("active");
     state.settings.pattern = chip.dataset.pattern;
     const hasPattern = chip.dataset.pattern !== "none";
+    els.patternColorControl.classList.toggle("hidden", !hasPattern);
     els.patternScaleControl.classList.toggle("hidden", !hasPattern);
     els.patternBlendControl.classList.toggle("hidden", !hasPattern);
     els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
@@ -1000,11 +1022,12 @@ function initControls() {
 function applySettingsToUI() {
   const {
     bgType, bgColor, pattern, canvasRatio, padding, radius, shadow,
-    blurAmount, patternScale, patternBlendMode, patternOpacity,
+    blurAmount, patternColor, patternScale, patternBlendMode, patternOpacity,
     overlayType, overlayText, overlayColor, overlaySize, overlayOpacity, overlayPosition,
   } = state.settings;
 
   els.bgColorInput.value = bgColor;
+  els.patternColorInput.value = patternColor || adaptivePatternColor(bgColor, bgType === "blur");
 
   syncChipPicker(els.bgTypePicker,  "bg-type", bgType);
   syncChipPicker(els.ratioPicker,    "ratio",   canvasRatio);
@@ -1014,6 +1037,7 @@ function applySettingsToUI() {
   els.bgColorControl.classList.toggle("hidden", bgType !== "solid");
   els.bgBlurControl.classList.toggle("hidden", bgType !== "blur");
   const hasPattern = pattern !== "none";
+  els.patternColorControl.classList.toggle("hidden", !hasPattern);
   els.patternScaleControl.classList.toggle("hidden", !hasPattern);
   els.patternBlendControl.classList.toggle("hidden", !hasPattern);
   els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
