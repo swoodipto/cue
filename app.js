@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS = {
   padding:     60,        // px — 0–120
   radius:      18,        // px — 0–60
   shadow:      40,        // 0–100 intensity
+  shadowSpread: 0,        // px — code-only, supports negative values like CSS spread
   overlayType: "none",    // "none" | "text" | "logo"
   overlayText: "Your brand",
   overlayColor: "#ffffff",
@@ -199,13 +200,107 @@ function playSliderTick(slider) {
 
 /* ── Shadow ─────────────────────────────────────────────────── */
 
-function computeShadow(intensity) {
+function computeShadow(intensity, spread = 0) {
   if (intensity <= 0) return null;
   const t = intensity / 100;
   return {
-    color:   `rgba(0,0,0,${(t * 0.35).toFixed(3)})`,
-    blur:    t * 72,
+    color:   `rgba(0,0,0,${(t * 0.2).toFixed(3)})`,
+    blur:    t * 75,
     offsetY: t * 30,
+    spread:  spread,
+  };
+}
+
+function createShadowMask(sourceCanvas, spreadPx) {
+  const spread = Math.round(spreadPx);
+  const outset = Math.max(0, spread) + 2;
+  const off = document.createElement("canvas");
+  off.width = sourceCanvas.width + outset * 2;
+  off.height = sourceCanvas.height + outset * 2;
+  const oc = off.getContext("2d");
+  if (!oc) {
+    return { canvas: sourceCanvas, offsetX: 0, offsetY: 0 };
+  }
+
+  if (spread >= 0) {
+    oc.drawImage(sourceCanvas, outset, outset);
+
+    if (spread > 0) {
+      // Positive spread grows the alpha footprint before blur.
+      const rings = Math.max(1, Math.ceil(spread / 4));
+      for (let ring = 1; ring <= rings; ring++) {
+        const radius = spread * (ring / rings);
+        const steps = Math.max(12, Math.ceil((Math.PI * 2 * radius) / 6));
+        for (let step = 0; step < steps; step++) {
+          const angle = (step / steps) * Math.PI * 2;
+          const dx = Math.round(Math.cos(angle) * radius);
+          const dy = Math.round(Math.sin(angle) * radius);
+          oc.drawImage(sourceCanvas, outset + dx, outset + dy);
+        }
+      }
+    }
+  } else {
+    // Negative spread contracts the silhouette inward before blur, which is
+    // the canvas equivalent of CSS's negative spread radius.
+    const inset = Math.min(
+      Math.abs(spread),
+      Math.floor((Math.min(sourceCanvas.width, sourceCanvas.height) - 1) / 2)
+    );
+    const drawW = Math.max(1, sourceCanvas.width - inset * 2);
+    const drawH = Math.max(1, sourceCanvas.height - inset * 2);
+    oc.drawImage(
+      sourceCanvas,
+      outset + inset,
+      outset + inset,
+      drawW,
+      drawH
+    );
+  }
+
+  oc.globalCompositeOperation = "source-in";
+  oc.fillStyle = "#000000";
+  oc.fillRect(0, 0, off.width, off.height);
+  oc.globalCompositeOperation = "source-over";
+
+  return { canvas: off, offsetX: outset, offsetY: outset };
+}
+
+function createShadowLayer(sourceCanvas, shadow) {
+  const mask = createShadowMask(sourceCanvas, shadow.spread);
+  const blurPad = Math.ceil(shadow.blur * 2.5);
+  const padX = blurPad + 4;
+  const padTop = blurPad + Math.max(0, -Math.round(shadow.offsetY)) + 4;
+  const padBottom = blurPad + Math.max(0, Math.round(shadow.offsetY)) + 4;
+  const off = document.createElement("canvas");
+  off.width = mask.canvas.width + padX * 2;
+  off.height = mask.canvas.height + padTop + padBottom;
+  const oc = off.getContext("2d");
+  if (!oc) {
+    return {
+      canvas: mask.canvas,
+      offsetX: mask.offsetX,
+      offsetY: mask.offsetY,
+    };
+  }
+
+  oc.shadowColor = shadow.color;
+  oc.shadowBlur = shadow.blur;
+  oc.shadowOffsetX = 0;
+  oc.shadowOffsetY = shadow.offsetY;
+  oc.drawImage(mask.canvas, padX, padTop);
+
+  // Remove the hard source mask so only the blurred shadow remains.
+  oc.globalCompositeOperation = "destination-out";
+  oc.shadowColor = "rgba(0,0,0,0)";
+  oc.shadowBlur = 0;
+  oc.shadowOffsetX = 0;
+  oc.shadowOffsetY = 0;
+  oc.drawImage(mask.canvas, padX, padTop);
+
+  return {
+    canvas: off,
+    offsetX: padX + mask.offsetX,
+    offsetY: padTop + mask.offsetY,
   };
 }
 
@@ -791,14 +886,10 @@ function render() {
     paintGrid(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   }
 
-  // 3 — Composite image + shadow in one pass via an offscreen canvas.
+  // 3 — Build the clipped image surface, then derive a shadow layer from its alpha.
   //
-  //     Why offscreen?  ctx.clip() also clips the shadow, so an external
-  //     shadow drawn with clip active is silently discarded.  By rendering
-  //     the corner-clipped image into a small offscreen first and then
-  //     stamping *that* onto the main canvas with the shadow, the shadow
-  //     extends freely outside the rounded rect while the image itself
-  //     stays cleanly clipped.
+  //     Why offscreen?  We want the image clipped cleanly while still being
+  //     able to contract or expand the shadow silhouette before blur.
   //
   //     Why no white fill?  The offscreen is transparent where the source
   //     image is transparent, so the shadow follows the actual visible
@@ -811,16 +902,16 @@ function render() {
   imgOc.clip();
   imgOc.drawImage(img, 0, 0, dW, dH);
 
-  const shadow = computeShadow(state.settings.shadow);
-  ctx.save();
+  const shadow = computeShadow(state.settings.shadow, state.settings.shadowSpread);
   if (shadow) {
-    ctx.shadowColor   = shadow.color;
-    ctx.shadowBlur    = shadow.blur;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = shadow.offsetY;
+    const shadowLayer = createShadowLayer(imgOff, shadow);
+    ctx.drawImage(
+      shadowLayer.canvas,
+      ix - shadowLayer.offsetX,
+      iy - shadowLayer.offsetY
+    );
   }
   ctx.drawImage(imgOff, ix, iy, dW, dH);
-  ctx.restore();
 
   paintOverlay(ctx, cW, cH);
 
