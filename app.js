@@ -113,6 +113,18 @@ const CANVAS_PRESETS = {
 
 const SOUND_MASTER_VOLUME = 1;
 const SLIDER_SOUND_INTERVAL_MS = 60;
+const MANUAL_UNLOCK_AFTER_ATTEMPTS = 2;
+
+function isAppleMobile() {
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const touchPoints = navigator.maxTouchPoints || 0;
+
+  return /iPhone|iPad|iPod/i.test(userAgent)
+    || (platform === "MacIntel" && touchPoints > 1);
+}
+
+const appleMobile = isAppleMobile();
 
 const UI_SOUNDS = {
   chip: "tab-switch",
@@ -130,17 +142,39 @@ const soundState = {
   patch: definePatch(minimalPatch),
   priming: null,
   ready: false,
+  pending: null,
+  unlockAttempts: 0,
+  showManualUnlock: false,
 };
 const sliderSoundTimestamps = new WeakMap();
+
+function removeAudioUnlockListeners(handler) {
+  document.removeEventListener("pointerdown", handler, true);
+  document.removeEventListener("pointerup", handler, true);
+  document.removeEventListener("touchstart", handler, true);
+  document.removeEventListener("touchend", handler, true);
+  document.removeEventListener("click", handler, true);
+  document.removeEventListener("keydown", handler, true);
+}
+
+function showManualUnlockFallback() {
+  if (!appleMobile || soundState.ready) return;
+  if (soundState.unlockAttempts < MANUAL_UNLOCK_AFTER_ATTEMPTS) return;
+  if (soundState.showManualUnlock) return;
+  soundState.showManualUnlock = true;
+  updateSoundUI();
+}
 
 function unlockAudio() {
   if (soundState.ready) return Promise.resolve(true);
   if (!state.settings?.soundEnabled) return Promise.resolve(false);
   if (!soundState.priming) {
     setMasterVolume(SOUND_MASTER_VOLUME);
+    updateSoundUI();
     soundState.priming = ensureReady()
       .then(() => {
         soundState.ready = true;
+        soundState.showManualUnlock = false;
 
         // iOS can be picky even after resume; a near-silent warmup helps
         // establish the graph once within the trusted gesture.
@@ -150,16 +184,31 @@ function unlockAudio() {
           // Ignore warmup failures and rely on the next real sound.
         }
 
+        if (soundState.pending) {
+          const { name, volume } = soundState.pending;
+          soundState.pending = null;
+          try {
+            soundState.patch.play(name, { volume });
+          } catch {
+            // Ignore queued replay failures.
+          }
+        }
+
+        updateSoundUI();
         return true;
       })
       .catch(() => {
         soundState.ready = false;
+        showManualUnlockFallback();
+        updateSoundUI();
         return false;
       })
       .finally(() => {
         if (!soundState.ready) {
           soundState.priming = null;
         }
+        showManualUnlockFallback();
+        updateSoundUI();
       });
   }
   return soundState.priming;
@@ -167,19 +216,34 @@ function unlockAudio() {
 
 function primeAudioOnFirstGesture() {
   const handleFirstGesture = () => {
+    if (!state.settings?.soundEnabled || soundState.ready) return;
+    soundState.unlockAttempts += 1;
+
+    if (appleMobile) {
+      try {
+        // Fire a nearly silent cue directly inside the first ordinary tap.
+        // This keeps the unlock path automatic for iOS without adding a step.
+        soundState.patch.play(UI_SOUNDS.slider, { volume: 0.0001 });
+      } catch {
+        // Ignore warmup failures and keep trying on later gestures.
+      }
+    }
+
     void unlockAudio();
-    document.removeEventListener("pointerdown", handleFirstGesture);
-    document.removeEventListener("touchstart", handleFirstGesture);
-    document.removeEventListener("touchend", handleFirstGesture);
-    document.removeEventListener("click", handleFirstGesture);
-    document.removeEventListener("keydown", handleFirstGesture);
   };
 
-  document.addEventListener("pointerdown", handleFirstGesture, { passive: true });
-  document.addEventListener("touchstart", handleFirstGesture, { passive: true });
-  document.addEventListener("touchend", handleFirstGesture, { passive: true });
-  document.addEventListener("click", handleFirstGesture, { passive: true });
-  document.addEventListener("keydown", handleFirstGesture);
+  const stopWhenReady = setInterval(() => {
+    if (!soundState.ready) return;
+    clearInterval(stopWhenReady);
+    removeAudioUnlockListeners(handleFirstGesture);
+  }, 500);
+
+  document.addEventListener("pointerdown", handleFirstGesture, { passive: true, capture: true });
+  document.addEventListener("pointerup", handleFirstGesture, { passive: true, capture: true });
+  document.addEventListener("touchstart", handleFirstGesture, { passive: true, capture: true });
+  document.addEventListener("touchend", handleFirstGesture, { passive: true, capture: true });
+  document.addEventListener("click", handleFirstGesture, { passive: true, capture: true });
+  document.addEventListener("keydown", handleFirstGesture, true);
 }
 
 function playSound(name, volume = 1) {
@@ -193,14 +257,93 @@ function playSound(name, volume = 1) {
     return;
   }
 
+  soundState.pending = { name, volume };
   void unlockAudio()
     .then((isReady) => {
       if (!isReady) return;
-      soundState.patch.play(name, { volume });
+      if (!soundState.pending) return;
+      const next = soundState.pending;
+      soundState.pending = null;
+      soundState.patch.play(next.name, { volume: next.volume });
     })
     .catch(() => {
       // Audio is additive UI polish, so failures should stay silent.
     });
+}
+
+function updateSoundUI() {
+  if (!els.soundUnlockControl || !els.soundUnlockBtn || !els.soundUnlockHint || !els.soundHelperText) {
+    return;
+  }
+
+  const soundEnabled = !!state.settings?.soundEnabled;
+  const needsUnlock = soundEnabled && !soundState.ready && soundState.showManualUnlock;
+
+  els.soundUnlockControl.classList.toggle("hidden", !needsUnlock);
+  els.soundUnlockBtn.disabled = !!soundState.priming;
+  els.soundUnlockBtn.textContent = soundState.priming
+    ? "Enabling Sound..."
+    : "Enable Sound on This Device";
+
+  if (!soundEnabled) {
+    els.soundHelperText.textContent = "Sound effects are turned off.";
+    els.soundUnlockHint.textContent = "Turn sounds on to enable UI feedback.";
+    return;
+  }
+
+  if (soundState.ready) {
+    els.soundHelperText.textContent = "Subtle cues for uploads, control changes, and export.";
+    els.soundUnlockHint.textContent = "Sound is ready on this device.";
+    return;
+  }
+
+  if (appleMobile && !soundState.showManualUnlock) {
+    els.soundHelperText.textContent = "Subtle cues for uploads, control changes, and export. Sound should start automatically on your first tap.";
+    els.soundUnlockHint.textContent = "If iPhone still blocks sound, the manual enable button will appear here.";
+    return;
+  }
+
+  if (!appleMobile && !soundState.showManualUnlock) {
+    els.soundHelperText.textContent = "Subtle cues for uploads, control changes, and export.";
+    els.soundUnlockHint.textContent = "Sound is still getting ready on this device.";
+    return;
+  }
+
+  if (soundState.priming) {
+    els.soundHelperText.textContent = "Trying to enable sound for this device.";
+    els.soundUnlockHint.textContent = "If nothing happens on iPhone, tap the button again.";
+    return;
+  }
+
+  els.soundHelperText.textContent = "Subtle cues for uploads, control changes, and export.";
+  els.soundUnlockHint.textContent = "Tap once on iPhone or iPad before UI sounds can play.";
+}
+
+async function enableSoundOnDevice() {
+  if (!state.settings.soundEnabled) {
+    state.settings.soundEnabled = true;
+    syncChipPicker(els.soundPicker, "sound", "on");
+    saveSession();
+  }
+
+  updateSoundUI();
+
+  const unlockPromise = unlockAudio();
+
+  try {
+    soundState.patch.play(UI_SOUNDS.soundOn, { volume: 0.78 });
+  } catch {
+    // If iOS drops the immediate confirmation, we still wait for unlock.
+  }
+
+  const isReady = await unlockPromise;
+  updateSoundUI();
+
+  if (isReady) {
+    showToast("Sounds enabled ✓");
+  } else {
+    showToast("Tap enable sound again.");
+  }
 }
 
 function playSliderTick(slider) {
@@ -831,6 +974,10 @@ const els = {
   overlayOpacitySlider: $("overlayOpacitySlider"),
   overlayOpacityVal: $("overlayOpacityVal"),
   soundPicker: $("soundPicker"),
+  soundUnlockControl: $("soundUnlockControl"),
+  soundUnlockBtn: $("soundUnlockBtn"),
+  soundUnlockHint: $("soundUnlockHint"),
+  soundHelperText: $("soundHelperText"),
 };
 
 const ctx = els.canvas.getContext("2d");
@@ -1348,6 +1495,7 @@ function showPreview() {
   els.sectionStyle.classList.remove("hidden");
   els.sectionExport.classList.remove("hidden");
   els.sectionFeedback.classList.remove("hidden");
+  updateSoundUI();
 
   // Re-trigger entrance animation on each new image load
   els.frame.classList.remove("enter-animate");
@@ -1731,9 +1879,14 @@ function initControls() {
     state.settings.soundEnabled = enabled;
     syncChipPicker(els.soundPicker, "sound", enabled ? "on" : "off");
     saveSession();
+    updateSoundUI();
     if (enabled) {
       playSound(UI_SOUNDS.soundOn, 0.78);
     }
+  });
+
+  els.soundUnlockBtn.addEventListener("click", () => {
+    void enableSoundOnDevice();
   });
 
   // Reset button
@@ -1806,6 +1959,8 @@ function applySettingsToUI() {
   els.shadowSlider.value = shadow;
   els.shadowVal.value    = shadow;
   refreshSlider(els.shadowSlider);
+
+  updateSoundUI();
 }
 
 function toDataAttrKey(dataKey) {

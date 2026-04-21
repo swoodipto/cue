@@ -479,7 +479,11 @@
                             <button type="button" class="chip active" data-sound="on">On</button>
                             <button type="button" class="chip" data-sound="off">Off</button>
                         </div>
-                        <p class="helper-text">Subtle cues for uploads, control changes, and export.</p>
+                        <div class="sound-unlock hidden" id="soundUnlockControl">
+                            <button type="button" class="secondary-btn" id="soundUnlockBtn">Enable Sound on This Device</button>
+                            <p class="helper-text" id="soundUnlockHint">Tap once on iPhone or iPad before UI sounds can play.</p>
+                        </div>
+                        <p class="helper-text" id="soundHelperText">Subtle cues for uploads, control changes, and export.</p>
                     </div>
                 </section>
 
