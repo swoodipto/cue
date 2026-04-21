@@ -1447,6 +1447,67 @@ function isCopyShortcut(event) {
     : event.ctrlKey && !event.metaKey;
 }
 
+function createCanvasPngBlobPromise() {
+  return new Promise((resolve, reject) => {
+    els.canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("PNG export failed"));
+    }, "image/png");
+  });
+}
+
+function getClipboardCopyErrorMessage(error) {
+  if (!window.isSecureContext) {
+    return "Clipboard copy needs HTTPS or localhost.";
+  }
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    return "Image copy isn't supported here.";
+  }
+  if (error?.message === "PNG export failed") {
+    return "Couldn't prepare the PNG for copying.";
+  }
+  if (error?.name === "NotAllowedError") {
+    return "Browser blocked clipboard access. Try again.";
+  }
+  if (error?.name === "AbortError") {
+    return "Copy was canceled before it finished.";
+  }
+  return "Couldn't copy the image.";
+}
+
+function copyCanvasToClipboard() {
+  if (!state.image) return Promise.resolve(false);
+  if (!window.isSecureContext) {
+    return Promise.reject(new Error("Clipboard requires a secure context"));
+  }
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    return Promise.reject(new Error("Clipboard API unavailable"));
+  }
+  const clipboardItem = new ClipboardItem({
+    "image/png": createCanvasPngBlobPromise(),
+  });
+  return navigator.clipboard.write([clipboardItem]);
+}
+
+function handleCopyToClipboardRequest() {
+  if (!state.image) return Promise.resolve(false);
+  return copyCanvasToClipboard()
+    .then(() => {
+      playSound(UI_SOUNDS.copy, 0.88);
+      showToast("Copied to clipboard ✓");
+      return true;
+    })
+    .catch((error) => {
+      console.error("Clipboard copy failed", error);
+      playSound(UI_SOUNDS.error, 0.9);
+      showToast(getClipboardCopyErrorMessage(error));
+      return false;
+    });
+}
+
 function initClipboard() {
   document.addEventListener("paste", (e) => {
     if (handleClipboardData(e.clipboardData)) {
@@ -1459,7 +1520,7 @@ function initClipboard() {
     if (!state.image || els.sectionExport.classList.contains("hidden")) return;
     if (isEditableTarget(e.target) || hasActiveTextSelection()) return;
     e.preventDefault();
-    els.copyBtn.click();
+    void handleCopyToClipboardRequest();
   });
 }
 
@@ -1766,18 +1827,8 @@ function initExport() {
     showToast("Downloaded ✓");
   });
 
-  els.copyBtn.addEventListener("click", async () => {
-    if (!state.image) return;
-    try {
-      const blob = await new Promise((res) => els.canvas.toBlob(res, "image/png"));
-      if (!blob) throw new Error("PNG export failed");
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      playSound(UI_SOUNDS.copy, 0.88);
-      showToast("Copied to clipboard ✓");
-    } catch {
-      playSound(UI_SOUNDS.error, 0.9);
-      showToast("Copy not supported in this browser.");
-    }
+  els.copyBtn.addEventListener("click", () => {
+    void handleCopyToClipboardRequest();
   });
 }
 
