@@ -3,15 +3,18 @@
    Offline-first caching strategy for PWA
    ============================================================ */
 
-const CACHE_NAME = "cue-v4";
+const CACHE_NAME = "cue-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./vendor/web-kits-audio.js",
+  "./patches/minimal.json",
   "./manifest.json",
-  "./assets/demo-ios-icon.svg",
+  "./assets/demo-ios-icon.png",
   "./assets/demo-zettel.png",
+  "./assets/tweet.png",
 ];
 
 function getCacheURL(path) {

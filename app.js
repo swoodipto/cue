@@ -1,3 +1,5 @@
+import { ensureReady, loadPatch, setMasterVolume } from "./vendor/web-kits-audio.js";
+
 /* ============================================================
    CUE — app.js
    State · Canvas · Upload · Clipboard · Controls · Export · Session
@@ -19,6 +21,10 @@ const state = {
   blurCache: null,
 };
 
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+}
+
 const DEFAULT_SETTINGS = {
   bgType:      "solid",   // "solid" | "blur"
   bgColor:     "#ffffff", // solid background colour
@@ -38,6 +44,7 @@ const DEFAULT_SETTINGS = {
   overlaySize: 18,        // percentage of canvas width
   overlayOpacity: 70,     // 10–100
   overlayPosition: "bottom-right", // corners | center
+  soundEnabled: !prefersReducedMotion(),
 };
 
 state.settings = { ...DEFAULT_SETTINGS };
@@ -96,6 +103,99 @@ const CANVAS_PRESETS = {
   "9:16": { cW: 338, cH: 600 },
   "3:4":  { cW: 450, cH: 600 },
 };
+
+/* ── Audio feedback ─────────────────────────────────────────── */
+
+const SOUND_PATCH_URL = "./patches/minimal.json";
+const SOUND_MASTER_VOLUME = 1;
+const SLIDER_SOUND_INTERVAL_MS = 60;
+
+const UI_SOUNDS = {
+  chip: "tab-switch",
+  slider: "tap",
+  soundOn: "toggle-on",
+  soundOff: "toggle-off",
+  import: "page-enter",
+  copy: "copy",
+  download: "success",
+  error: "error",
+  reset: "undo",
+};
+
+const soundState = {
+  patch: null,
+  patchPromise: null,
+  priming: null,
+  ready: false,
+};
+const sliderSoundTimestamps = new WeakMap();
+
+function warmSoundPatch() {
+  if (soundState.patch) return Promise.resolve(soundState.patch);
+  if (!soundState.patchPromise) {
+    soundState.patchPromise = loadPatch(SOUND_PATCH_URL)
+      .then((patch) => {
+        soundState.patch = patch;
+        return patch;
+      })
+      .catch(() => {
+        soundState.patchPromise = null;
+        return null;
+      });
+  }
+  return soundState.patchPromise;
+}
+
+function unlockAudio() {
+  if (soundState.ready) return Promise.resolve(true);
+  if (!state.settings?.soundEnabled) return Promise.resolve(false);
+  if (!soundState.priming) {
+    soundState.priming = ensureReady()
+      .then(() => {
+        setMasterVolume(SOUND_MASTER_VOLUME);
+        soundState.ready = true;
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        if (!soundState.ready) {
+          soundState.priming = null;
+        }
+      });
+  }
+  return soundState.priming;
+}
+
+function primeAudioOnFirstGesture() {
+  const handleFirstGesture = () => {
+    void unlockAudio();
+    document.removeEventListener("pointerdown", handleFirstGesture);
+    document.removeEventListener("keydown", handleFirstGesture);
+  };
+
+  document.addEventListener("pointerdown", handleFirstGesture, { passive: true });
+  document.addEventListener("keydown", handleFirstGesture);
+}
+
+function playSound(name, volume = 1) {
+  if (!state.settings?.soundEnabled) return;
+  void Promise.all([unlockAudio(), warmSoundPatch()])
+    .then(([isReady, patch]) => {
+      if (!isReady || !patch) return;
+      patch.play(name, { volume });
+    })
+    .catch(() => {
+      // Audio is additive UI polish, so failures should stay silent.
+    });
+}
+
+function playSliderTick(slider) {
+  const now = performance.now();
+  const lastTick = sliderSoundTimestamps.get(slider) || 0;
+  if (now - lastTick < SLIDER_SOUND_INTERVAL_MS) return;
+  sliderSoundTimestamps.set(slider, now);
+  playSound(UI_SOUNDS.slider, 0.72);
+}
 
 /* ── Shadow ─────────────────────────────────────────────────── */
 
@@ -519,6 +619,7 @@ const els = {
   imageLabel:    $("imageLabel"),
   sectionStyle:  $("section-style"),
   sectionExport: $("section-export"),
+  sectionFeedback: $("section-feedback"),
   // Appearance controls
   ratioPicker:   $("ratioPicker"),
   bgTypePicker:  $("bgTypePicker"),
@@ -560,6 +661,7 @@ const els = {
   overlayOpacityControl: $("overlayOpacityControl"),
   overlayOpacitySlider: $("overlayOpacitySlider"),
   overlayOpacityVal: $("overlayOpacityVal"),
+  soundPicker: $("soundPicker"),
 };
 
 const ctx = els.canvas.getContext("2d");
@@ -879,6 +981,7 @@ async function setImage(src, options = {}) {
     persist = true,
     label = null,
     isDemo = false,
+    soundName = null,
   } = options;
 
   try {
@@ -892,13 +995,20 @@ async function setImage(src, options = {}) {
     render();
     state.imageDataURL = persist ? toStorageURL(img) : null;
     saveSession();
+    if (soundName) {
+      playSound(soundName, 0.9);
+    }
   } catch {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Could not display image.");
   }
 }
 
 async function loadDemoImage(demo = pickDemoImage()) {
-  applySettings(demo.settings);
+  applySettings({
+    ...demo.settings,
+    soundEnabled: state.settings.soundEnabled,
+  });
   await setImage(demo.src, {
     persist: false,
     label: demo.label,
@@ -913,13 +1023,14 @@ async function loadFileAsImage(file) {
       persist: true,
       label: file.name || "pasted-image.png",
       isDemo: false,
+      soundName: UI_SOUNDS.import,
     });
   } finally {
     URL.revokeObjectURL(objectURL);
   }
 }
 
-async function setLogoImage(src, persist = true) {
+async function setLogoImage(src, persist = true, soundName = null) {
   try {
     const img = await loadImgElement(src);
     state.logoImage = img;
@@ -927,7 +1038,11 @@ async function setLogoImage(src, persist = true) {
     updateOverlayUI();
     render();
     saveSession();
+    if (soundName) {
+      playSound(soundName, 0.75);
+    }
   } catch {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Could not load logo.");
   }
 }
@@ -937,12 +1052,13 @@ function loadLogoFile(file) {
   const lowerName = file.name.toLowerCase();
   const isSupportedType = file.type === "image/png" || lowerName.endsWith(".png");
   if (!isSupportedType) {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Please use a PNG logo.");
     return;
   }
   const reader = new FileReader();
   reader.onload = async (e) => {
-    await setLogoImage(e.target.result);
+    await setLogoImage(e.target.result, true, UI_SOUNDS.import);
   };
   reader.readAsDataURL(file);
 }
@@ -962,10 +1078,12 @@ function extractImageURLFromHTML(html) {
 function handleFile(file) {
   if (!file) return;
   if (file.type && !file.type.startsWith("image/")) {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Please use a PNG, JPG, or WEBP image.");
     return;
   }
   loadFileAsImage(file).catch(() => {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Could not display image.");
   });
 }
@@ -988,7 +1106,7 @@ function handleClipboardData(clipboardData) {
       const src = extractImageURLFromHTML(html);
       if (!src) return;
       playPasteAnimation();
-      setImage(src);
+      setImage(src, { soundName: UI_SOUNDS.import });
     });
     return true;
   }
@@ -1029,7 +1147,9 @@ async function loadFromURL(url) {
     // Still compress for storage, but the display uses the original
     state.imageDataURL = toStorageURL(img);
     saveSession();
+    playSound(UI_SOUNDS.import, 0.9);
   } catch {
+    playSound(UI_SOUNDS.error, 0.9);
     showToast("Couldn't load that URL — make sure it's a direct image link.");
   }
 }
@@ -1041,6 +1161,7 @@ function showPreview() {
   els.resetBtn.classList.remove("hidden");
   els.sectionStyle.classList.remove("hidden");
   els.sectionExport.classList.remove("hidden");
+  els.sectionFeedback.classList.remove("hidden");
 
   // Re-trigger entrance animation on each new image load
   els.frame.classList.remove("enter-animate");
@@ -1070,6 +1191,7 @@ async function resetCanvas() {
   invalidateBlurCache();
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   await loadDemoImage();
+  playSound(UI_SOUNDS.reset, 0.82);
 }
 
 /* ── Upload zone ────────────────────────────────────────────── */
@@ -1106,6 +1228,7 @@ function initUpload() {
   els.previewArea.addEventListener("drop", (e) => {
     e.preventDefault();
     els.previewArea.classList.remove("drag-over");
+    void unlockAudio();
     handleFile(e.dataTransfer.files[0]);
   });
 
@@ -1113,6 +1236,7 @@ function initUpload() {
   document.addEventListener("dragover", (e) => e.preventDefault());
   document.addEventListener("drop", (e) => {
     e.preventDefault();
+    void unlockAudio();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) handleFile(file);
   });
@@ -1154,8 +1278,12 @@ function connectSlider(slider, numInput, key, min, max) {
     render();
     saveSession();
   };
-  slider.addEventListener("input",    () => apply(slider.value));
+  slider.addEventListener("input",    () => {
+    apply(slider.value);
+    playSliderTick(slider);
+  });
   numInput.addEventListener("change", () => apply(numInput.value));
+  numInput.addEventListener("change", () => playSound(UI_SOUNDS.slider, 0.72));
   numInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") numInput.blur();
   });
@@ -1168,17 +1296,20 @@ function initControls() {
   els.ratioPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-ratio]");
     if (!chip) return;
+    if (state.settings.canvasRatio === chip.dataset.ratio) return;
     els.ratioPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.canvasRatio = chip.dataset.ratio;
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   // Background type
   els.bgTypePicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-bg-type]");
     if (!chip) return;
+    if (state.settings.bgType === chip.dataset.bgType) return;
 
     els.bgTypePicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
@@ -1187,6 +1318,7 @@ function initControls() {
     els.bgBlurControl.classList.toggle("hidden", chip.dataset.bgType !== "blur");
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   // Background colour
@@ -1206,6 +1338,7 @@ function initControls() {
   els.patternPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-pattern]");
     if (!chip) return;
+    if (state.settings.pattern === chip.dataset.pattern) return;
     els.patternPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.pattern = chip.dataset.pattern;
@@ -1216,17 +1349,20 @@ function initControls() {
     els.patternOpacityControl.classList.toggle("hidden", !hasPattern);
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   // Pattern blend mode picker
   els.patternBlendPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-blend]");
     if (!chip) return;
+    if (state.settings.patternBlendMode === chip.dataset.blend) return;
     els.patternBlendPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.patternBlendMode = chip.dataset.blend;
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   // Blur amount slider (only visible when bgType === "blur")
@@ -1248,20 +1384,24 @@ function initControls() {
   els.overlayTypePicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-overlay-type]");
     if (!chip) return;
+    if (state.settings.overlayType === chip.dataset.overlayType) return;
     syncChipPicker(els.overlayTypePicker, "overlayType", chip.dataset.overlayType);
     state.settings.overlayType = chip.dataset.overlayType;
     updateOverlayUI();
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   els.overlayPositionPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-overlay-position]");
     if (!chip) return;
+    if (state.settings.overlayPosition === chip.dataset.overlayPosition) return;
     syncChipPicker(els.overlayPositionPicker, "overlayPosition", chip.dataset.overlayPosition);
     state.settings.overlayPosition = chip.dataset.overlayPosition;
     render();
     saveSession();
+    playSound(UI_SOUNDS.chip, 0.78);
   });
 
   els.overlayTextInput.addEventListener("input", () => {
@@ -1276,6 +1416,22 @@ function initControls() {
     saveSession();
   });
 
+  els.soundPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-sound]");
+    if (!chip) return;
+    const enabled = chip.dataset.sound === "on";
+    if (enabled === state.settings.soundEnabled) return;
+    if (!enabled && state.settings.soundEnabled) {
+      playSound(UI_SOUNDS.soundOff, 0.78);
+    }
+    state.settings.soundEnabled = enabled;
+    syncChipPicker(els.soundPicker, "sound", enabled ? "on" : "off");
+    saveSession();
+    if (enabled) {
+      playSound(UI_SOUNDS.soundOn, 0.78);
+    }
+  });
+
   // Reset button
   els.resetBtn.addEventListener("click", resetCanvas);
 }
@@ -1286,6 +1442,7 @@ function applySettingsToUI() {
     bgType, bgColor, pattern, canvasRatio, padding, radius, shadow,
     blurAmount, patternColor, patternScale, patternBlendMode, patternOpacity,
     overlayType, overlayText, overlayColor, overlaySize, overlayOpacity, overlayPosition,
+    soundEnabled,
   } = state.settings;
 
   els.bgColorInput.value = bgColor;
@@ -1294,6 +1451,7 @@ function applySettingsToUI() {
   syncChipPicker(els.bgTypePicker,  "bg-type", bgType);
   syncChipPicker(els.ratioPicker,    "ratio",   canvasRatio);
   syncChipPicker(els.patternPicker,  "pattern", pattern);
+  syncChipPicker(els.soundPicker, "sound", soundEnabled ? "on" : "off");
 
   // Show controls based on selections
   els.bgColorControl.classList.toggle("hidden", bgType !== "solid");
@@ -1342,9 +1500,19 @@ function applySettingsToUI() {
   refreshSlider(els.shadowSlider);
 }
 
+function toDataAttrKey(dataKey) {
+  return dataKey.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+}
+
+function toDatasetKey(dataKey) {
+  return dataKey.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+}
+
 function syncChipPicker(container, dataKey, value) {
-  container.querySelectorAll(`.chip[data-${dataKey}]`).forEach((c) => {
-    c.classList.toggle("active", c.dataset[dataKey] === value);
+  const attrKey = toDataAttrKey(dataKey);
+  const datasetKey = toDatasetKey(attrKey);
+  container.querySelectorAll(`.chip[data-${attrKey}]`).forEach((c) => {
+    c.classList.toggle("active", c.dataset[datasetKey] === value);
   });
 }
 
@@ -1357,6 +1525,7 @@ function initExport() {
     link.download = "cue-export.png";
     link.href     = els.canvas.toDataURL("image/png");
     link.click();
+    playSound(UI_SOUNDS.download, 0.92);
     showToast("Downloaded ✓");
   });
 
@@ -1364,9 +1533,12 @@ function initExport() {
     if (!state.image) return;
     try {
       const blob = await new Promise((res) => els.canvas.toBlob(res, "image/png"));
+      if (!blob) throw new Error("PNG export failed");
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      playSound(UI_SOUNDS.copy, 0.88);
       showToast("Copied to clipboard ✓");
     } catch {
+      playSound(UI_SOUNDS.error, 0.9);
       showToast("Copy not supported in this browser.");
     }
   });
@@ -1445,6 +1617,8 @@ window.addEventListener("resize", () => {
 async function init() {
   state.canvasBlurMode = detectNativeCanvasBlurSupport() ? "native" : "software";
   invalidateBlurCache();
+  primeAudioOnFirstGesture();
+  void warmSoundPatch();
 
   // Initialise slider track fills from their default HTML values
   refreshSlider(els.paddingSlider);

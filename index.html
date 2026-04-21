@@ -429,6 +429,18 @@
                     <p class="export-note">2× resolution · No watermark</p>
                 </section>
 
+                <section class="panel-section hidden" id="section-feedback">
+                    <p class="section-label">Feedback</p>
+                    <div class="control-group">
+                        <span class="control-label">Sounds</span>
+                        <div class="chip-row" id="soundPicker">
+                            <button type="button" class="chip active" data-sound="on">On</button>
+                            <button type="button" class="chip" data-sound="off">Off</button>
+                        </div>
+                        <p class="helper-text">Subtle cues for uploads, control changes, and export.</p>
+                    </div>
+                </section>
+
                 <section class="panel-section bottom" id="section-danger">
                     <button class="reset-btn hidden" id="resetBtn" title="Start over with a new image">
                         <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -450,7 +462,7 @@
             accept=".png,image/png"
             hidden
         />
-        <script src="app.js"></script>
+        <script type="module" src="app.js"></script>
         <script>
           // Register service worker for offline support
           if ('serviceWorker' in navigator) {
