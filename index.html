@@ -21,38 +21,19 @@
 
         <main class="layout">
             <!-- CENTER: Preview area -->
-            <!-- Before image → upload UI  |  After image → canvas -->
             <div class="preview-area" id="previewArea">
-
-                <!-- Empty state: upload UI (hidden when demo/user image is loaded) -->
-                <div class="empty-state" id="emptyState">
-
-                    <div class="upload-zone" id="uploadZone">
-                        <input
-                            type="file"
-                            id="fileInput"
-                            accept="image/png,image/jpeg,image/webp"
-                            hidden
-                        />
-                        <div class="upload-icon">↑</div>
-                        <p class="upload-title">Drop image here</p>
-                        <p class="upload-sub">
-                            or
-                            <button class="link-btn" id="browseBtn">
-                                browse files
-                            </button>
-                        </p>
-                        <p class="upload-formats">PNG · JPG · WEBP</p>
-                        <p class="upload-paste">or paste an image / URL &nbsp;—&nbsp; ⌘V</p>
-                        </div>
-
-                </div>
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept="image/png,image/jpeg,image/webp"
+                    hidden
+                />
 
                 <!-- Canvas frame (shown when image is loaded) -->
-                    <div class="frame-wrap hidden" id="frameWrap">
-                        <div class="frame">
-                            <canvas id="previewCanvas"></canvas>
-                        </div>
+                <div class="frame-wrap" id="frameWrap">
+                    <div class="frame">
+                        <canvas id="previewCanvas"></canvas>
+                    </div>
                     <div class="canvas-actions" id="canvasActions">
                         <span class="canvas-actions-label">Paste Image with ⌘+V / Ctrl+V, Drop an Image OR</span>
                         <button class="canvas-browse-btn" id="canvasBrowseBtn">Upload Image</button>

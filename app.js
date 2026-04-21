@@ -238,11 +238,8 @@ function paintBlurredBackground(ctx, img, cW, cH, blurPx) {
 const $ = (id) => document.getElementById(id);
 
 const els = {
-  uploadZone:    $("uploadZone"),
   fileInput:     $("fileInput"),
   logoFileInput: $("logoFileInput"),
-  browseBtn:     $("browseBtn"),
-  emptyState:    $("emptyState"),
   previewArea:   $("previewArea"),
   frameWrap:     $("frameWrap"),
   frame:         document.querySelector(".frame"),
@@ -758,8 +755,6 @@ async function loadFromURL(url) {
 /* ── Show / hide preview ────────────────────────────────────── */
 
 function showPreview() {
-  els.emptyState.classList.add("hidden");
-  els.frameWrap.classList.remove("hidden");
   els.panel.classList.remove("hidden");
   els.resetBtn.classList.remove("hidden");
   els.sectionStyle.classList.remove("hidden");
@@ -776,7 +771,7 @@ function showPreview() {
 }
 
 function playPasteAnimation() {
-  const target = state.image ? els.frameWrap : els.uploadZone;
+  const target = els.frameWrap;
   target.classList.remove("paste-animate");
   void target.offsetWidth;
   target.classList.add("paste-animate");
@@ -797,16 +792,6 @@ async function resetCanvas() {
 /* ── Upload zone ────────────────────────────────────────────── */
 
 function initUpload() {
-  els.uploadZone.addEventListener("click", (e) => {
-    if (e.target === els.browseBtn || e.target.closest(".link-btn")) return;
-    els.fileInput.click();
-  });
-
-  els.browseBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    els.fileInput.click();
-  });
-
   els.canvasBrowseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     els.fileInput.click();
@@ -827,16 +812,17 @@ function initUpload() {
     els.fileInput.value = ""; // reset so same file can be re-selected
   });
 
-  els.uploadZone.addEventListener("dragover", (e) => {
+  els.previewArea.addEventListener("dragover", (e) => {
     e.preventDefault();
-    els.uploadZone.classList.add("drag-over");
+    els.previewArea.classList.add("drag-over");
   });
-  els.uploadZone.addEventListener("dragleave", () => {
-    els.uploadZone.classList.remove("drag-over");
+  els.previewArea.addEventListener("dragleave", (e) => {
+    if (e.relatedTarget && els.previewArea.contains(e.relatedTarget)) return;
+    els.previewArea.classList.remove("drag-over");
   });
-  els.uploadZone.addEventListener("drop", (e) => {
+  els.previewArea.addEventListener("drop", (e) => {
     e.preventDefault();
-    els.uploadZone.classList.remove("drag-over");
+    els.previewArea.classList.remove("drag-over");
     handleFile(e.dataTransfer.files[0]);
   });
 

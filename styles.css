@@ -164,18 +164,6 @@ svg {
     padding: 0 40px;
 }
 
-/* ── Empty state (upload UI, centered in preview area) ──────── */
-
-.empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-    width: 100%;
-    max-width: 460px;
-    padding: 0 16px;
-}
-
 /* ── Canvas frame ───────────────────────────────────────────── */
 
 .frame-wrap {
@@ -225,6 +213,7 @@ svg {
         0 0 0 1px rgba(0, 0, 0, 0.06),
         0 4px 16px rgba(0, 0, 0, 0.08),
         0 12px 40px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .frame canvas {
@@ -252,6 +241,11 @@ svg {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     opacity: 1;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        border-color 0.15s ease,
+        background 0.15s ease;
 }
 
 .frame.enter-animate {
@@ -340,76 +334,19 @@ svg {
     color: var(--color-text-faint);
 }
 
-/* ── Upload zone (large, centered in preview area) ──────────── */
-
-.upload-zone {
-    border: 1.5px dashed #d0d0d0;
-    border-radius: 16px;
-    padding: 56px 32px;
-    text-align: center;
-    cursor: pointer;
-    transition:
-        border-color 0.15s,
-        background 0.15s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 7px;
-    background: #ffffff;
+.preview-area.drag-over .frame {
+    transform: translateY(-2px);
+    box-shadow:
+        0 0 0 1px rgba(26, 26, 26, 0.12),
+        0 12px 32px rgba(0, 0, 0, 0.12),
+        0 24px 56px rgba(0, 0, 0, 0.08);
 }
 
-.upload-zone:hover,
-.upload-zone.drag-over {
-    border-color: #aaa;
-    background: #fafafa;
-}
-
-.upload-icon {
-    font-size: 28px;
-    color: #c0c0c0;
-    margin-bottom: 4px;
-    line-height: 1;
-}
-
-.upload-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--color-text);
-}
-
-.upload-sub {
-    font-size: 14px;
-    color: var(--color-text-muted);
-}
-
-.upload-formats {
-    font-size: 12px;
-    color: var(--color-text-faint);
-    font-family: var(--font-mono);
-    margin-top: 4px;
-    letter-spacing: 0.04em;
-}
-
-.upload-paste {
-    font-size: 12px;
-    color: var(--color-text-faint);
-    margin-top: 6px;
-}
-
-.link-btn {
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: inherit;
-    font-family: inherit;
-    color: var(--color-text-muted);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    cursor: pointer;
-}
-
-.link-btn:hover {
-    color: var(--color-text);
+.preview-area.drag-over .canvas-actions {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(26, 26, 26, 0.16);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
 }
 
 .text-input {
@@ -778,20 +715,6 @@ svg {
         padding: 16px;
         border-bottom: 1px solid var(--color-border);
         overflow: hidden;
-    }
-
-    .empty-state {
-        max-width: 100%;
-        padding: 0;
-    }
-
-    .upload-zone {
-        padding: 24px 18px;
-        border-radius: 12px;
-    }
-
-    .upload-title {
-        font-size: 15px;
     }
 
     .frame,
