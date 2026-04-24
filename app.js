@@ -70,11 +70,11 @@ const DEMO_IMAGES = [
     src: "./assets/demo-zettel.png",
     label: "demo-screenshot.png",
     settings: {
-      bgColor: "#f0efeb",
+      bgColor: "#d7dbe0",
       canvasRatio: "free",
-      padding: 40,
-      radius: 24,
-      shadow: 24,
+      padding: 100,
+      radius: 0,
+      shadow: 60,
     },
   },
   {
