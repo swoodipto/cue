@@ -2004,8 +2004,12 @@ function connectSlider(slider, numInput, key, min, max) {
     if (key === "overlaySize") {
       state.overlaySizeAutoFit = false;
       state.pendingLogoAutoFit = false;
-    } else if (key === "padding" && state.overlaySizeAutoFit) {
-      autoFitActiveOverlaySize();
+    } else if (key === "padding") {
+      if (state.overlaySizeAutoFit) {
+        autoFitActiveOverlaySize();
+      } else {
+        syncOverlaySizeBounds();
+      }
     }
     slider.value         = val;
     numInput.value       = val;
@@ -2037,6 +2041,8 @@ function initControls() {
     state.settings.canvasRatio = chip.dataset.ratio;
     if (state.overlaySizeAutoFit) {
       autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
     }
     render();
     saveSession();
@@ -2166,6 +2172,8 @@ function initControls() {
     state.settings.overlayPosition = chip.dataset.overlayPosition;
     if (state.overlaySizeAutoFit) {
       autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
     }
     render();
     saveSession();
@@ -2176,6 +2184,8 @@ function initControls() {
     state.settings.overlayText = els.overlayTextInput.value;
     if (state.overlaySizeAutoFit) {
       autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
     }
     render();
     saveSession();
