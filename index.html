@@ -365,6 +365,27 @@
                             placeholder="Add watermark text"
                             maxlength="40"
                         />
+                        <div class="control-row">
+                            <label class="control-label" for="overlayFontSelect">Font</label>
+                            <select id="overlayFontSelect" class="font-select">
+                                <option
+                                    value="sans-serif"
+                                    style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;"
+                                >Sans-serif</option>
+                                <option
+                                    value="serif"
+                                    style="font-family: Georgia, 'Times New Roman', Times, serif;"
+                                >Serif</option>
+                                <option
+                                    value="handwritten"
+                                    style="font-family: 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', 'Marker Felt', cursive;"
+                                >Handwritten</option>
+                                <option
+                                    value="monospace"
+                                    style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;"
+                                >Monospace</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="control-group hidden" id="overlayLogoControl">

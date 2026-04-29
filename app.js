@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = {
   shadowSpread: 0,        // px — code-only, supports negative values like CSS spread
   overlayType: "none",    // "none" | "text" | "logo"
   overlayText: "Your brand",
+  overlayFont: "sans-serif",
   overlayColor: "#ffffff",
   overlaySize: 18,        // percentage of canvas width
   overlayOpacity: 70,     // 10–100
@@ -96,6 +97,12 @@ const OVERLAY_SIZE_LIMITS = {
   none: 30,
   text: 30,
   logo: 30,
+};
+const OVERLAY_FONT_STACKS = {
+  "sans-serif": 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  serif: 'Georgia, "Times New Roman", Times, serif',
+  handwritten: '"Bradley Hand", "Segoe Print", "Comic Sans MS", "Marker Felt", cursive',
+  monospace: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
 };
 const OVERLAY_SIZE_MIN = 1;
 const OVERLAY_AUTO_FILL = 0.92;
@@ -968,6 +975,7 @@ const els = {
   overlayTypePicker: $("overlayTypePicker"),
   overlayTextControl: $("overlayTextControl"),
   overlayTextInput: $("overlayTextInput"),
+  overlayFontSelect: $("overlayFontSelect"),
   overlayColorInput: $("overlayColorInput"),
   overlayLogoControl: $("overlayLogoControl"),
   overlayLogoBtn: $("overlayLogoBtn"),
@@ -1381,7 +1389,7 @@ function paintOverlay(ctx, layout) {
 
   if (overlayType === "text" && overlayText.trim()) {
     const fontSize = Math.max(1, Math.round((cW * overlaySize) / 100));
-    ctx.font = `600 ${fontSize}px ${getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui"}`;
+    ctx.font = `600 ${fontSize}px ${getOverlayFontFamily()}`;
     ctx.fillStyle = overlayColor;
     ctx.textBaseline = "top";
     const metrics = ctx.measureText(overlayText);
@@ -1406,7 +1414,7 @@ function paintOverlay(ctx, layout) {
 }
 
 function getOverlayFontFamily() {
-  return getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui";
+  return OVERLAY_FONT_STACKS[state.settings.overlayFont] || OVERLAY_FONT_STACKS["sans-serif"];
 }
 
 function measureOverlayTextWidthAtFontSize(text, fontSize) {
@@ -1470,6 +1478,16 @@ function syncOverlaySizeControls() {
   els.overlaySizeSlider.value = state.settings.overlaySize;
   els.overlaySizeVal.value = state.settings.overlaySize;
   refreshSlider(els.overlaySizeSlider);
+}
+
+function syncOverlayFontSelect() {
+  const fontKey = OVERLAY_FONT_STACKS[state.settings.overlayFont]
+    ? state.settings.overlayFont
+    : DEFAULT_SETTINGS.overlayFont;
+
+  state.settings.overlayFont = fontKey;
+  els.overlayFontSelect.value = fontKey;
+  els.overlayFontSelect.style.fontFamily = getOverlayFontFamily();
 }
 
 function getOverlaySizeLimit() {
@@ -1569,6 +1587,7 @@ function updateOverlayUI() {
   els.overlayLogoHint.textContent = state.logoDataURL
     ? "Logo ready for export."
     : "No logo selected.";
+  syncOverlayFontSelect();
   syncOverlaySizeBounds();
 }
 
@@ -2191,6 +2210,19 @@ function initControls() {
     saveSession();
   });
 
+  els.overlayFontSelect.addEventListener("change", () => {
+    state.settings.overlayFont = els.overlayFontSelect.value;
+    syncOverlayFontSelect();
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
+    }
+    render();
+    saveSession();
+    playSound(UI_SOUNDS.chip, 0.72);
+  });
+
   els.overlayColorInput.addEventListener("input", () => {
     state.settings.overlayColor = els.overlayColorInput.value;
     render();
@@ -2228,7 +2260,7 @@ function applySettingsToUI() {
     bgType, bgColor, bgGradientStartColor, bgGradientEndColor, bgGradientDirection,
     pattern, canvasRatio, padding, radius, shadow,
     blurAmount, patternColor, patternScale, patternBlendMode, patternOpacity,
-    overlayType, overlayText, overlayColor, overlaySize, overlayOpacity, overlayPosition,
+    overlayType, overlayText, overlayFont, overlayColor, overlaySize, overlayOpacity, overlayPosition,
     soundEnabled,
   } = state.settings;
 
@@ -2254,6 +2286,8 @@ function applySettingsToUI() {
   syncChipPicker(els.overlayTypePicker, "overlayType", overlayType);
   syncChipPicker(els.overlayPositionPicker, "overlayPosition", overlayPosition);
   els.overlayTextInput.value = overlayText;
+  els.overlayFontSelect.value = overlayFont;
+  syncOverlayFontSelect();
   els.overlayColorInput.value = overlayColor;
   els.overlaySizeSlider.value = overlaySize;
   els.overlaySizeVal.value = overlaySize;

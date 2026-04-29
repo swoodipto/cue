@@ -365,6 +365,22 @@ svg {
     border-color: var(--color-border-focus);
 }
 
+.font-select {
+    min-width: 144px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px 32px 8px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    background: #ffffff;
+    outline: none;
+}
+
+.font-select:focus {
+    border-color: var(--color-border-focus);
+}
+
 .secondary-btn {
     border: 1px solid var(--color-border);
     border-radius: 10px;
