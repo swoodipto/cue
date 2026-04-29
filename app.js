@@ -18,6 +18,8 @@ const state = {
   isDemo: true,
   imageLabel: "demo-image.png",
   settings: null,
+  overlaySizeAutoFit: false,
+  pendingLogoAutoFit: false,
   canvasBlurMode: "software", // "native" | "software"
   blurCache: null,
 };
@@ -48,7 +50,7 @@ const DEFAULT_SETTINGS = {
   overlayColor: "#ffffff",
   overlaySize: 18,        // percentage of canvas width
   overlayOpacity: 70,     // 10–100
-  overlayPosition: "bottom-right", // corners | center
+  overlayPosition: "bottom-right", // corners | edges
   soundEnabled: !prefersReducedMotion(),
 };
 
@@ -95,6 +97,11 @@ const OVERLAY_SIZE_LIMITS = {
   text: 30,
   logo: 30,
 };
+const OVERLAY_SIZE_MIN = 1;
+const OVERLAY_AUTO_FILL = 0.92;
+const OVERLAY_TEXT_LINE_HEIGHT = 1.15;
+const OVERLAY_FALLBACK_LOGO_ASPECT = 1;
+const OVERLAY_AREA_INSET_RATIO = 0.14;
 
 const BLUR_SOFTWARE_PIXEL_BUDGET = 360000;
 const BLUR_SOFTWARE_MAX_SCALE = 8;
@@ -986,11 +993,59 @@ const ctx = els.canvas.getContext("2d");
 
 const SCALE = 2; // 2× backing store → retina-sharp export
 
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getCanvasLayout(img, settings = state.settings) {
+  const pad = settings.padding;
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  const aspect = imgH ? imgW / imgH : 1;
+  const preset = CANVAS_PRESETS[settings.canvasRatio];
+  let cW, cH, dW, dH, ix, iy;
+
+  if (!preset) {
+    // Free: canvas sized to original image at full resolution.
+    dW = imgW;
+    dH = imgH;
+    cW = dW + pad * 2;
+    cH = dH + pad * 2;
+    ix = pad;
+    iy = pad;
+  } else {
+    cW = preset.cW;
+    cH = preset.cH;
+
+    const baseSize = 560;
+    const maxImageDim = Math.max(imgW, imgH);
+    const presetScale = Math.max(1, maxImageDim / baseSize);
+
+    cW = Math.round(cW * presetScale);
+    cH = Math.round(cH * presetScale);
+
+    const availW = Math.max(1, cW - pad * 2);
+    const availH = Math.max(1, cH - pad * 2);
+
+    if (aspect > availW / availH) {
+      dW = availW;
+      dH = Math.max(1, Math.round(availW / aspect));
+    } else {
+      dH = availH;
+      dW = Math.max(1, Math.round(availH * aspect));
+    }
+
+    ix = Math.round((cW - dW) / 2);
+    iy = Math.round((cH - dH) / 2);
+  }
+
+  return { cW, cH, dW, dH, ix, iy, imgW, imgH, aspect, pad };
+}
+
 function render() {
   if (!state.image) return;
 
   const img     = state.image;
-  const pad     = state.settings.padding;
   const r       = state.settings.radius;
   const {
     bgType,
@@ -1009,52 +1064,8 @@ function render() {
   const opacity = patternOpacity / 100;
   const resolvedPatternColor = patternColor
     || adaptivePatternColor(getBackgroundReferenceColor(state.settings), bgType === "blur");
-
-  const imgW   = img.naturalWidth;
-  const imgH   = img.naturalHeight;
-  const aspect = imgW / imgH;
-
-  let cW, cH, dW, dH, ix, iy;
-
-  const preset = CANVAS_PRESETS[state.settings.canvasRatio];
-
-  if (!preset) {
-    // ── Free: canvas sized to original image at full resolution ──
-    // No downscaling — display at 1:1 for crisp text and details
-    dW = imgW;
-    dH = imgH;
-    cW = dW + pad * 2;
-    cH = dH + pad * 2;
-    ix = pad;
-    iy = pad;
-  } else {
-    // ── Preset ratio: scale up for large images to avoid blur ──
-    cW = preset.cW;
-    cH = preset.cH;
-
-    // Scale preset based on image size to prevent downscaling blur
-    const baseSize = 560; // reference preset size
-    const maxImageDim = Math.max(imgW, imgH);
-    const scale = Math.max(1, maxImageDim / baseSize);
-
-    cW = Math.round(cW * scale);
-    cH = Math.round(cH * scale);
-
-    const availW = Math.max(1, cW - pad * 2);
-    const availH = Math.max(1, cH - pad * 2);
-
-    // Fit image into available space while preserving its aspect ratio
-    if (aspect > availW / availH) {
-      dW = availW;
-      dH = Math.max(1, Math.round(availW / aspect));
-    } else {
-      dH = availH;
-      dW = Math.max(1, Math.round(availH * aspect));
-    }
-
-    ix = Math.round((cW - dW) / 2);
-    iy = Math.round((cH - dH) / 2);
-  }
+  const layout = getCanvasLayout(img, state.settings);
+  const { cW, cH, dW, dH, ix, iy } = layout;
 
   // Size the pixel buffer at 2×
   els.canvas.width  = cW * SCALE;
@@ -1147,13 +1158,140 @@ function render() {
   }
   ctx.drawImage(imgOff, ix, iy, dW, dH);
 
-  paintOverlay(ctx, cW, cH);
+  paintOverlay(ctx, layout);
 
   ctx.restore();
 }
 
-function getOverlayPlacement(position, boxW, boxH, canvasW, canvasH) {
-  const margin = Math.max(16, Math.round(Math.min(canvasW, canvasH) * 0.04));
+function getOverlayBaseMargin(canvasW, canvasH) {
+  return Math.max(16, Math.round(Math.min(canvasW, canvasH) * 0.04));
+}
+
+function isSideOverlayPosition(position) {
+  return position === "left-side" || position === "right-side";
+}
+
+function getOverlayAlign(position) {
+  if (isSideOverlayPosition(position)) {
+    return {
+      hAlign: "center",
+      vAlign: "center",
+    };
+  }
+
+  return {
+    hAlign: position.endsWith("left")
+      ? "start"
+      : position.endsWith("right")
+        ? "end"
+        : "center",
+    vAlign: position.startsWith("top") ? "start" : "end",
+  };
+}
+
+function getOverlayCandidateAreas(position, layout) {
+  if (!layout) return [];
+
+  const { cW, cH, dW, dH, ix, iy } = layout;
+  const { hAlign, vAlign } = getOverlayAlign(position);
+  const imageRight = ix + dW;
+  const imageBottom = iy + dH;
+  const areas = [];
+
+  if (isSideOverlayPosition(position)) {
+    areas.push({
+      x: position === "left-side" ? 0 : imageRight,
+      y: iy,
+      w: position === "left-side" ? Math.max(0, ix) : Math.max(0, cW - imageRight),
+      h: dH,
+      hAlign: "center",
+      vAlign: "center",
+      primary: true,
+    });
+
+    return areas.filter((area) => area.w > 0 && area.h > 0);
+  }
+
+  if (vAlign === "start") {
+    areas.push({
+      x: 0,
+      y: 0,
+      w: cW,
+      h: Math.max(0, iy),
+      hAlign,
+      vAlign,
+      primary: true,
+    });
+  } else {
+    areas.push({
+      x: 0,
+      y: imageBottom,
+      w: cW,
+      h: Math.max(0, cH - imageBottom),
+      hAlign,
+      vAlign,
+      primary: true,
+    });
+  }
+
+  if (hAlign === "start") {
+    areas.push({
+      x: 0,
+      y: 0,
+      w: Math.max(0, ix),
+      h: cH,
+      hAlign,
+      vAlign,
+      primary: false,
+    });
+  } else if (hAlign === "end") {
+    areas.push({
+      x: imageRight,
+      y: 0,
+      w: Math.max(0, cW - imageRight),
+      h: cH,
+      hAlign,
+      vAlign,
+      primary: false,
+    });
+  }
+
+  return areas.filter((area) => area.w > 0 && area.h > 0);
+}
+
+function getOverlayAreaInset(area, canvasW, canvasH) {
+  const shortestSide = Math.min(area.w, area.h);
+  if (shortestSide <= 0) return 0;
+  return Math.round(Math.min(
+    getOverlayBaseMargin(canvasW, canvasH),
+    Math.max(4, shortestSide * OVERLAY_AREA_INSET_RATIO)
+  ));
+}
+
+function getOverlayAreaInnerSize(area, canvasW, canvasH) {
+  const inset = getOverlayAreaInset(area, canvasW, canvasH);
+  return {
+    inset,
+    innerW: Math.max(1, area.w - inset * 2),
+    innerH: Math.max(1, area.h - inset * 2),
+  };
+}
+
+function alignOverlayAxis(start, length, boxSize, inset, align) {
+  const min = start + inset;
+  const max = start + length - inset - boxSize;
+
+  if (max < min) {
+    return Math.round(start + (length - boxSize) / 2);
+  }
+
+  if (align === "center") return Math.round((min + max) / 2);
+  if (align === "end") return Math.round(max);
+  return Math.round(min);
+}
+
+function getLegacyOverlayPlacement(position, boxW, boxH, canvasW, canvasH) {
+  const margin = getOverlayBaseMargin(canvasW, canvasH);
 
   switch (position) {
     case "top-left":
@@ -1172,13 +1310,61 @@ function getOverlayPlacement(position, boxW, boxH, canvasW, canvasH) {
         x: Math.round((canvasW - boxW) / 2),
         y: canvasH - boxH - margin,
       };
+    case "left-side":
+      return {
+        x: margin,
+        y: Math.round((canvasH - boxH) / 2),
+      };
+    case "right-side":
+      return {
+        x: canvasW - boxW - margin,
+        y: Math.round((canvasH - boxH) / 2),
+      };
     case "bottom-right":
     default:
       return { x: canvasW - boxW - margin, y: canvasH - boxH - margin };
   }
 }
 
-function paintOverlay(ctx, cW, cH) {
+function placeOverlayInArea(area, boxW, boxH, canvasW, canvasH) {
+  const { inset } = getOverlayAreaInnerSize(area, canvasW, canvasH);
+  return {
+    x: alignOverlayAxis(area.x, area.w, boxW, inset, area.hAlign),
+    y: alignOverlayAxis(area.y, area.h, boxH, inset, area.vAlign),
+  };
+}
+
+function getOverlayPlacement(position, boxW, boxH, layout) {
+  const { cW, cH } = layout;
+  const candidates = getOverlayCandidateAreas(position, layout)
+    .map((area, index) => {
+      const { innerW, innerH } = getOverlayAreaInnerSize(area, cW, cH);
+      const fitScore = Math.min(innerW / Math.max(1, boxW), innerH / Math.max(1, boxH));
+      return {
+        area,
+        index,
+        fits: boxW <= innerW && boxH <= innerH,
+        fitScore,
+      };
+    })
+    .filter((candidate) => candidate.fitScore > 0);
+
+  if (!candidates.length) {
+    return getLegacyOverlayPlacement(position, boxW, boxH, cW, cH);
+  }
+
+  candidates.sort((a, b) => {
+    if (a.fits !== b.fits) return a.fits ? -1 : 1;
+    if (a.fits && a.area.primary !== b.area.primary) return a.area.primary ? -1 : 1;
+    if (b.fitScore !== a.fitScore) return b.fitScore - a.fitScore;
+    return a.index - b.index;
+  });
+
+  return placeOverlayInArea(candidates[0].area, boxW, boxH, cW, cH);
+}
+
+function paintOverlay(ctx, layout) {
+  const { cW, cH } = layout;
   const {
     overlayType,
     overlayText,
@@ -1194,14 +1380,14 @@ function paintOverlay(ctx, cW, cH) {
   ctx.globalAlpha = overlayOpacity / 100;
 
   if (overlayType === "text" && overlayText.trim()) {
-    const fontSize = Math.max(8, Math.round((cW * overlaySize) / 100));
+    const fontSize = Math.max(1, Math.round((cW * overlaySize) / 100));
     ctx.font = `600 ${fontSize}px ${getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui"}`;
     ctx.fillStyle = overlayColor;
     ctx.textBaseline = "top";
     const metrics = ctx.measureText(overlayText);
     const boxW = Math.ceil(metrics.width);
     const boxH = Math.ceil(fontSize * 1.15);
-    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, cW, cH);
+    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, layout);
     ctx.fillText(overlayText, x, y);
     ctx.restore();
     return;
@@ -1210,13 +1396,105 @@ function paintOverlay(ctx, cW, cH) {
   if (overlayType === "logo" && state.logoImage) {
     const maxW = Math.round((cW * overlaySize) / 100);
     const aspect = state.logoImage.naturalWidth / state.logoImage.naturalHeight || 1;
-    const boxW = Math.max(24, maxW);
-    const boxH = Math.max(24, Math.round(boxW / aspect));
-    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, cW, cH);
+    const boxW = Math.max(1, maxW);
+    const boxH = Math.max(1, Math.round(boxW / aspect));
+    const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, layout);
     ctx.drawImage(state.logoImage, x, y, boxW, boxH);
   }
 
   ctx.restore();
+}
+
+function getOverlayFontFamily() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui";
+}
+
+function measureOverlayTextWidthAtFontSize(text, fontSize) {
+  ctx.save();
+  ctx.font = `600 ${fontSize}px ${getOverlayFontFamily()}`;
+  const width = ctx.measureText(text).width;
+  ctx.restore();
+  return width;
+}
+
+function getAutoTextOverlaySize(layout) {
+  const text = state.settings.overlayText.trim() || DEFAULT_SETTINGS.overlayText;
+  const widthAt100 = Math.max(1, measureOverlayTextWidthAtFontSize(text, 100));
+  const widthPerPx = widthAt100 / 100;
+  const areas = getOverlayCandidateAreas(state.settings.overlayPosition, layout);
+  let bestFontSize = 0;
+
+  if (!areas.length && isSideOverlayPosition(state.settings.overlayPosition)) {
+    return OVERLAY_SIZE_MIN;
+  }
+
+  areas.forEach((area) => {
+    const { innerW, innerH } = getOverlayAreaInnerSize(area, layout.cW, layout.cH);
+    const fontByWidth = innerW / widthPerPx;
+    const fontByHeight = innerH / OVERLAY_TEXT_LINE_HEIGHT;
+    bestFontSize = Math.max(bestFontSize, Math.min(fontByWidth, fontByHeight));
+  });
+
+  if (!bestFontSize) return DEFAULT_SETTINGS.overlaySize;
+  return Math.floor((bestFontSize * OVERLAY_AUTO_FILL / layout.cW) * 100);
+}
+
+function getAutoLogoOverlaySize(layout) {
+  const logo = state.logoImage;
+  const aspect = logo
+    ? logo.naturalWidth / logo.naturalHeight || OVERLAY_FALLBACK_LOGO_ASPECT
+    : OVERLAY_FALLBACK_LOGO_ASPECT;
+  const areas = getOverlayCandidateAreas(state.settings.overlayPosition, layout);
+  let bestLogoWidth = 0;
+
+  if (!areas.length && isSideOverlayPosition(state.settings.overlayPosition)) {
+    return OVERLAY_SIZE_MIN;
+  }
+
+  areas.forEach((area) => {
+    const { innerW, innerH } = getOverlayAreaInnerSize(area, layout.cW, layout.cH);
+    bestLogoWidth = Math.max(bestLogoWidth, Math.min(innerW, innerH * aspect));
+  });
+
+  if (!bestLogoWidth) return DEFAULT_SETTINGS.overlaySize;
+  return Math.floor((bestLogoWidth * OVERLAY_AUTO_FILL / layout.cW) * 100);
+}
+
+function getAutoOverlaySize(type, layout) {
+  if (type === "text") return getAutoTextOverlaySize(layout);
+  if (type === "logo") return getAutoLogoOverlaySize(layout);
+  return DEFAULT_SETTINGS.overlaySize;
+}
+
+function syncOverlaySizeControls() {
+  els.overlaySizeSlider.value = state.settings.overlaySize;
+  els.overlaySizeVal.value = state.settings.overlaySize;
+  refreshSlider(els.overlaySizeSlider);
+}
+
+function getOverlaySizeLimit() {
+  const { overlayType, overlayPosition } = state.settings;
+  const baseMax = OVERLAY_SIZE_LIMITS[overlayType] || OVERLAY_SIZE_LIMITS.none;
+
+  if (!state.image || overlayType === "none" || !isSideOverlayPosition(overlayPosition)) {
+    return baseMax;
+  }
+
+  const layout = getCanvasLayout(state.image, state.settings);
+  const sideMax = getAutoOverlaySize(overlayType, layout);
+  return clampNumber(sideMax, OVERLAY_SIZE_MIN, baseMax);
+}
+
+function autoFitActiveOverlaySize() {
+  const { overlayType } = state.settings;
+  if (!state.image || overlayType === "none") return false;
+
+  const max = getOverlaySizeLimit();
+  const layout = getCanvasLayout(state.image, state.settings);
+  const autoSize = getAutoOverlaySize(overlayType, layout);
+  state.settings.overlaySize = clampNumber(autoSize, OVERLAY_SIZE_MIN, max);
+  syncOverlaySizeBounds();
+  return true;
 }
 
 function tracedRoundRect(ctx, x, y, w, h, r) {
@@ -1263,15 +1541,18 @@ function updateImageLabel(label) {
 }
 
 function syncOverlaySizeBounds() {
-  const max = OVERLAY_SIZE_LIMITS[state.settings.overlayType] || OVERLAY_SIZE_LIMITS.none;
+  const max = getOverlaySizeLimit();
+  els.overlaySizeSlider.min = String(OVERLAY_SIZE_MIN);
+  els.overlaySizeVal.min = String(OVERLAY_SIZE_MIN);
   els.overlaySizeSlider.max = String(max);
   els.overlaySizeVal.max = String(max);
+  if (state.settings.overlaySize < OVERLAY_SIZE_MIN) {
+    state.settings.overlaySize = OVERLAY_SIZE_MIN;
+  }
   if (state.settings.overlaySize > max) {
     state.settings.overlaySize = max;
   }
-  els.overlaySizeSlider.value = state.settings.overlaySize;
-  els.overlaySizeVal.value = state.settings.overlaySize;
-  refreshSlider(els.overlaySizeSlider);
+  syncOverlaySizeControls();
 }
 
 function updateOverlayUI() {
@@ -1325,6 +1606,11 @@ async function setImage(src, options = {}) {
     state.imageLabel = label || "image_mockups.png";
     updateImageLabel(state.imageLabel);
     showPreview();
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
+    }
     render();
     state.imageDataURL = persist ? toStorageURL(img) : null;
     saveSession();
@@ -1363,11 +1649,20 @@ async function loadFileAsImage(file) {
   }
 }
 
-async function setLogoImage(src, persist = true, soundName = null) {
+async function setLogoImage(src, persist = true, soundName = null, options = {}) {
+  const { autoFit = false } = options;
+
   try {
     const img = await loadImgElement(src);
     state.logoImage = img;
     state.logoDataURL = persist ? src : null;
+    if (autoFit || state.pendingLogoAutoFit) {
+      state.overlaySizeAutoFit = state.settings.overlayType === "logo";
+      autoFitActiveOverlaySize();
+    } else {
+      syncOverlaySizeBounds();
+    }
+    state.pendingLogoAutoFit = false;
     updateOverlayUI();
     render();
     saveSession();
@@ -1391,7 +1686,9 @@ function loadLogoFile(file) {
   }
   const reader = new FileReader();
   reader.onload = async (e) => {
-    await setLogoImage(e.target.result, true, UI_SOUNDS.import);
+    await setLogoImage(e.target.result, true, UI_SOUNDS.import, {
+      autoFit: state.settings.overlayType === "logo" && state.overlaySizeAutoFit,
+    });
   };
   reader.readAsDataURL(file);
 }
@@ -1699,9 +1996,17 @@ function refreshSlider(slider) {
  */
 function connectSlider(slider, numInput, key, min, max) {
   const apply = (raw) => {
-    const val = Math.min(max, Math.max(min, Math.round(+raw)));
+    const inputMin = key === "overlaySize" ? Number(slider.min) || min : min;
+    const inputMax = key === "overlaySize" ? Number(slider.max) || max : max;
+    const val = clampNumber(Math.round(+raw), inputMin, inputMax);
     if (!Number.isFinite(val)) return;
     state.settings[key] = val;
+    if (key === "overlaySize") {
+      state.overlaySizeAutoFit = false;
+      state.pendingLogoAutoFit = false;
+    } else if (key === "padding" && state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    }
     slider.value         = val;
     numInput.value       = val;
     refreshSlider(slider);
@@ -1730,6 +2035,9 @@ function initControls() {
     els.ratioPicker.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     state.settings.canvasRatio = chip.dataset.ratio;
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    }
     render();
     saveSession();
     playSound(UI_SOUNDS.chip, 0.78);
@@ -1830,7 +2138,7 @@ function initControls() {
   connectSlider(els.paddingSlider, els.paddingVal, "padding", 0, 120);
   connectSlider(els.radiusSlider,  els.radiusVal,  "radius",  0,  60);
   connectSlider(els.shadowSlider,  els.shadowVal,  "shadow",  0, 100);
-  connectSlider(els.overlaySizeSlider, els.overlaySizeVal, "overlaySize", 4, 40);
+  connectSlider(els.overlaySizeSlider, els.overlaySizeVal, "overlaySize", OVERLAY_SIZE_MIN, 40);
   connectSlider(els.overlayOpacitySlider, els.overlayOpacityVal, "overlayOpacity", 10, 100);
 
   els.overlayTypePicker.addEventListener("click", (e) => {
@@ -1839,6 +2147,11 @@ function initControls() {
     if (state.settings.overlayType === chip.dataset.overlayType) return;
     syncChipPicker(els.overlayTypePicker, "overlayType", chip.dataset.overlayType);
     state.settings.overlayType = chip.dataset.overlayType;
+    state.overlaySizeAutoFit = state.settings.overlayType !== "none";
+    state.pendingLogoAutoFit = state.settings.overlayType === "logo" && !state.logoImage;
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    }
     updateOverlayUI();
     render();
     saveSession();
@@ -1851,6 +2164,9 @@ function initControls() {
     if (state.settings.overlayPosition === chip.dataset.overlayPosition) return;
     syncChipPicker(els.overlayPositionPicker, "overlayPosition", chip.dataset.overlayPosition);
     state.settings.overlayPosition = chip.dataset.overlayPosition;
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    }
     render();
     saveSession();
     playSound(UI_SOUNDS.chip, 0.78);
@@ -1858,6 +2174,9 @@ function initControls() {
 
   els.overlayTextInput.addEventListener("input", () => {
     state.settings.overlayText = els.overlayTextInput.value;
+    if (state.overlaySizeAutoFit) {
+      autoFitActiveOverlaySize();
+    }
     render();
     saveSession();
   });
