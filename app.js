@@ -51,6 +51,7 @@ const DEFAULT_SETTINGS = {
   overlayColor: "#ffffff",
   overlayBlendMode: "none", // "none" | "overlay" | "screen"
   overlaySize: 18,        // percentage of canvas width
+  overlayEdgeDistance: 0,  // px of extra inset from the canvas edge
   overlayOpacity: 70,     // 10–100
   overlayPosition: "bottom-right", // corners | edges
   soundEnabled: !prefersReducedMotion(),
@@ -107,6 +108,7 @@ const OVERLAY_FONT_STACKS = {
 };
 const OVERLAY_BLEND_MODES = new Set(["none", "overlay", "screen"]);
 const OVERLAY_SIZE_MIN = 1;
+const OVERLAY_EDGE_DISTANCE_MIN = 0;
 const OVERLAY_AUTO_FILL = 0.92;
 const OVERLAY_TEXT_LINE_HEIGHT = 1.15;
 const OVERLAY_FALLBACK_LOGO_ASPECT = 1;
@@ -986,6 +988,9 @@ const els = {
   overlayPositionPicker: $("overlayPositionPicker"),
   overlayBlendControl: $("overlayBlendControl"),
   overlayBlendPicker: $("overlayBlendPicker"),
+  overlayEdgeDistanceControl: $("overlayEdgeDistanceControl"),
+  overlayEdgeDistanceSlider: $("overlayEdgeDistanceSlider"),
+  overlayEdgeDistanceVal: $("overlayEdgeDistanceVal"),
   overlaySizeControl: $("overlaySizeControl"),
   overlaySizeSlider: $("overlaySizeSlider"),
   overlaySizeVal: $("overlaySizeVal"),
@@ -1216,7 +1221,7 @@ function getOverlayCandidateAreas(position, layout) {
       y: iy,
       w: position === "left-side" ? Math.max(0, ix) : Math.max(0, cW - imageRight),
       h: dH,
-      hAlign: "center",
+      hAlign: position === "left-side" ? "start" : "end",
       vAlign: "center",
       primary: true,
     });
@@ -1289,9 +1294,10 @@ function getOverlayAreaInnerSize(area, canvasW, canvasH) {
   };
 }
 
-function alignOverlayAxis(start, length, boxSize, inset, align) {
-  const min = start + inset;
-  const max = start + length - inset - boxSize;
+function alignOverlayAxis(start, length, boxSize, inset, align, extraInset = 0) {
+  const edgeInset = inset + (align === "center" ? 0 : extraInset);
+  const min = start + edgeInset;
+  const max = start + length - edgeInset - boxSize;
 
   if (max < min) {
     return Math.round(start + (length - boxSize) / 2);
@@ -1338,15 +1344,40 @@ function getLegacyOverlayPlacement(position, boxW, boxH, canvasW, canvasH) {
   }
 }
 
+function getOverlayExtraDistanceLimit(area, boxW, boxH, canvasW, canvasH) {
+  const { inset } = getOverlayAreaInnerSize(area, canvasW, canvasH);
+  const limits = [];
+
+  if (area.hAlign !== "center") {
+    limits.push(Math.max(0, area.w - boxW - inset * 2));
+  }
+  if (area.vAlign !== "center") {
+    limits.push(Math.max(0, area.h - boxH - inset * 2));
+  }
+
+  if (!limits.length) return 0;
+  return Math.floor(Math.min(...limits));
+}
+
+function getEffectiveOverlayExtraDistance(area, boxW, boxH, canvasW, canvasH) {
+  const requested = Math.round(Number(state.settings.overlayEdgeDistance) || 0);
+  return clampNumber(
+    requested,
+    OVERLAY_EDGE_DISTANCE_MIN,
+    getOverlayExtraDistanceLimit(area, boxW, boxH, canvasW, canvasH)
+  );
+}
+
 function placeOverlayInArea(area, boxW, boxH, canvasW, canvasH) {
   const { inset } = getOverlayAreaInnerSize(area, canvasW, canvasH);
+  const extraInset = getEffectiveOverlayExtraDistance(area, boxW, boxH, canvasW, canvasH);
   return {
-    x: alignOverlayAxis(area.x, area.w, boxW, inset, area.hAlign),
-    y: alignOverlayAxis(area.y, area.h, boxH, inset, area.vAlign),
+    x: alignOverlayAxis(area.x, area.w, boxW, inset, area.hAlign, extraInset),
+    y: alignOverlayAxis(area.y, area.h, boxH, inset, area.vAlign, extraInset),
   };
 }
 
-function getOverlayPlacement(position, boxW, boxH, layout) {
+function getOverlayPlacementCandidate(position, boxW, boxH, layout) {
   const { cW, cH } = layout;
   const candidates = getOverlayCandidateAreas(position, layout)
     .map((area, index) => {
@@ -1362,7 +1393,7 @@ function getOverlayPlacement(position, boxW, boxH, layout) {
     .filter((candidate) => candidate.fitScore > 0);
 
   if (!candidates.length) {
-    return getLegacyOverlayPlacement(position, boxW, boxH, cW, cH);
+    return null;
   }
 
   candidates.sort((a, b) => {
@@ -1372,7 +1403,18 @@ function getOverlayPlacement(position, boxW, boxH, layout) {
     return a.index - b.index;
   });
 
-  return placeOverlayInArea(candidates[0].area, boxW, boxH, cW, cH);
+  return candidates[0];
+}
+
+function getOverlayPlacement(position, boxW, boxH, layout) {
+  const { cW, cH } = layout;
+  const candidate = getOverlayPlacementCandidate(position, boxW, boxH, layout);
+
+  if (!candidate) {
+    return getLegacyOverlayPlacement(position, boxW, boxH, cW, cH);
+  }
+
+  return placeOverlayInArea(candidate.area, boxW, boxH, cW, cH);
 }
 
 function paintOverlay(ctx, layout) {
@@ -1482,10 +1524,43 @@ function getAutoOverlaySize(type, layout) {
   return DEFAULT_SETTINGS.overlaySize;
 }
 
+function getOverlayBoxSize(type, layout) {
+  const { cW } = layout;
+
+  if (type === "text") {
+    const text = state.settings.overlayText.trim() || DEFAULT_SETTINGS.overlayText;
+    const fontSize = Math.max(1, Math.round((cW * state.settings.overlaySize) / 100));
+    const width = measureOverlayTextWidthAtFontSize(text, fontSize);
+    return {
+      boxW: Math.ceil(width),
+      boxH: Math.ceil(fontSize * OVERLAY_TEXT_LINE_HEIGHT),
+    };
+  }
+
+  if (type === "logo") {
+    const aspect = state.logoImage
+      ? state.logoImage.naturalWidth / state.logoImage.naturalHeight || OVERLAY_FALLBACK_LOGO_ASPECT
+      : OVERLAY_FALLBACK_LOGO_ASPECT;
+    const boxW = Math.max(1, Math.round((cW * state.settings.overlaySize) / 100));
+    return {
+      boxW,
+      boxH: Math.max(1, Math.round(boxW / aspect)),
+    };
+  }
+
+  return { boxW: 0, boxH: 0 };
+}
+
 function syncOverlaySizeControls() {
   els.overlaySizeSlider.value = state.settings.overlaySize;
   els.overlaySizeVal.value = state.settings.overlaySize;
   refreshSlider(els.overlaySizeSlider);
+}
+
+function syncOverlayEdgeDistanceControls() {
+  els.overlayEdgeDistanceSlider.value = state.settings.overlayEdgeDistance;
+  els.overlayEdgeDistanceVal.value = state.settings.overlayEdgeDistance;
+  refreshSlider(els.overlayEdgeDistanceSlider);
 }
 
 function syncOverlayFontSelect() {
@@ -1503,6 +1578,38 @@ function syncOverlayBlendMode() {
     state.settings.overlayBlendMode = DEFAULT_SETTINGS.overlayBlendMode;
   }
   syncChipPicker(els.overlayBlendPicker, "overlayBlend", state.settings.overlayBlendMode);
+}
+
+function getOverlayEdgeDistanceLimit() {
+  const { overlayType, overlayPosition } = state.settings;
+  if (!state.image || overlayType === "none") return 0;
+
+  const layout = getCanvasLayout(state.image, state.settings);
+  const { boxW, boxH } = getOverlayBoxSize(overlayType, layout);
+  if (boxW <= 0 || boxH <= 0) return 0;
+
+  const candidate = getOverlayPlacementCandidate(overlayPosition, boxW, boxH, layout);
+  if (!candidate) return 0;
+
+  return getOverlayExtraDistanceLimit(candidate.area, boxW, boxH, layout.cW, layout.cH);
+}
+
+function syncOverlayEdgeDistanceBounds() {
+  const max = getOverlayEdgeDistanceLimit();
+  els.overlayEdgeDistanceSlider.min = String(OVERLAY_EDGE_DISTANCE_MIN);
+  els.overlayEdgeDistanceVal.min = String(OVERLAY_EDGE_DISTANCE_MIN);
+  els.overlayEdgeDistanceSlider.max = String(max);
+  els.overlayEdgeDistanceVal.max = String(max);
+  els.overlayEdgeDistanceSlider.disabled = max <= OVERLAY_EDGE_DISTANCE_MIN;
+  els.overlayEdgeDistanceVal.disabled = max <= OVERLAY_EDGE_DISTANCE_MIN;
+
+  if (state.settings.overlayEdgeDistance < OVERLAY_EDGE_DISTANCE_MIN) {
+    state.settings.overlayEdgeDistance = OVERLAY_EDGE_DISTANCE_MIN;
+  }
+  if (state.settings.overlayEdgeDistance > max) {
+    state.settings.overlayEdgeDistance = max;
+  }
+  syncOverlayEdgeDistanceControls();
 }
 
 function getOverlaySizeLimit() {
@@ -1586,6 +1693,7 @@ function syncOverlaySizeBounds() {
     state.settings.overlaySize = max;
   }
   syncOverlaySizeControls();
+  syncOverlayEdgeDistanceBounds();
 }
 
 function updateOverlayUI() {
@@ -1598,6 +1706,7 @@ function updateOverlayUI() {
   els.overlayLogoControl.classList.toggle("hidden", !showLogo);
   els.overlayPositionControl.classList.toggle("hidden", !showOverlayControls);
   els.overlayBlendControl.classList.toggle("hidden", !showOverlayControls);
+  els.overlayEdgeDistanceControl.classList.toggle("hidden", !showOverlayControls);
   els.overlaySizeControl.classList.toggle("hidden", !showOverlayControls);
   els.overlayOpacityControl.classList.toggle("hidden", !showOverlayControls);
   els.overlayLogoHint.textContent = state.logoDataURL
@@ -2022,7 +2131,7 @@ function refreshSlider(slider) {
   const min = parseFloat(slider.min);
   const max = parseFloat(slider.max);
   const val = parseFloat(slider.value);
-  const pct = ((val - min) / (max - min)) * 100;
+  const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
   slider.style.setProperty("--pct", pct.toFixed(1) + "%");
 }
 
@@ -2032,14 +2141,20 @@ function refreshSlider(slider) {
  */
 function connectSlider(slider, numInput, key, min, max) {
   const apply = (raw) => {
-    const inputMin = key === "overlaySize" ? Number(slider.min) || min : min;
-    const inputMax = key === "overlaySize" ? Number(slider.max) || max : max;
+    const hasDynamicBounds = key === "overlaySize" || key === "overlayEdgeDistance";
+    const sliderMin = Number(slider.min);
+    const sliderMax = Number(slider.max);
+    const inputMin = hasDynamicBounds && Number.isFinite(sliderMin) ? sliderMin : min;
+    const inputMax = hasDynamicBounds && Number.isFinite(sliderMax) ? sliderMax : max;
     const val = clampNumber(Math.round(+raw), inputMin, inputMax);
     if (!Number.isFinite(val)) return;
     state.settings[key] = val;
     if (key === "overlaySize") {
       state.overlaySizeAutoFit = false;
       state.pendingLogoAutoFit = false;
+      syncOverlayEdgeDistanceBounds();
+    } else if (key === "overlayEdgeDistance") {
+      syncOverlayEdgeDistanceBounds();
     } else if (key === "padding") {
       if (state.overlaySizeAutoFit) {
         autoFitActiveOverlaySize();
@@ -2047,8 +2162,9 @@ function connectSlider(slider, numInput, key, min, max) {
         syncOverlaySizeBounds();
       }
     }
-    slider.value         = val;
-    numInput.value       = val;
+    const appliedVal = state.settings[key];
+    slider.value         = appliedVal;
+    numInput.value       = appliedVal;
     refreshSlider(slider);
     render();
     saveSession();
@@ -2181,6 +2297,13 @@ function initControls() {
   connectSlider(els.radiusSlider,  els.radiusVal,  "radius",  0,  60);
   connectSlider(els.shadowSlider,  els.shadowVal,  "shadow",  0, 100);
   connectSlider(els.overlaySizeSlider, els.overlaySizeVal, "overlaySize", OVERLAY_SIZE_MIN, 40);
+  connectSlider(
+    els.overlayEdgeDistanceSlider,
+    els.overlayEdgeDistanceVal,
+    "overlayEdgeDistance",
+    OVERLAY_EDGE_DISTANCE_MIN,
+    120
+  );
   connectSlider(els.overlayOpacitySlider, els.overlayOpacityVal, "overlayOpacity", 10, 100);
 
   els.overlayTypePicker.addEventListener("click", (e) => {
@@ -2288,7 +2411,8 @@ function applySettingsToUI() {
     bgType, bgColor, bgGradientStartColor, bgGradientEndColor, bgGradientDirection,
     pattern, canvasRatio, padding, radius, shadow,
     blurAmount, patternColor, patternScale, patternBlendMode, patternOpacity,
-    overlayType, overlayText, overlayFont, overlayColor, overlayBlendMode, overlaySize, overlayOpacity, overlayPosition,
+    overlayType, overlayText, overlayFont, overlayColor, overlayBlendMode,
+    overlaySize, overlayEdgeDistance, overlayOpacity, overlayPosition,
     soundEnabled,
   } = state.settings;
 
@@ -2321,6 +2445,9 @@ function applySettingsToUI() {
   els.overlaySizeSlider.value = overlaySize;
   els.overlaySizeVal.value = overlaySize;
   refreshSlider(els.overlaySizeSlider);
+  els.overlayEdgeDistanceSlider.value = overlayEdgeDistance;
+  els.overlayEdgeDistanceVal.value = overlayEdgeDistance;
+  refreshSlider(els.overlayEdgeDistanceSlider);
   els.overlayOpacitySlider.value = overlayOpacity;
   els.overlayOpacityVal.value = overlayOpacity;
   refreshSlider(els.overlayOpacitySlider);
@@ -2471,6 +2598,7 @@ async function init() {
   refreshSlider(els.blurSlider);
   refreshSlider(els.patternScaleSlider);
   refreshSlider(els.patternOpacitySlider);
+  refreshSlider(els.overlayEdgeDistanceSlider);
 
   initUpload();
   initClipboard();

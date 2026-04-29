@@ -3,7 +3,7 @@
    Offline-first caching strategy for PWA
    ============================================================ */
 
-const CACHE_NAME = "cue-v13";
+const CACHE_NAME = "cue-v14";
 const APP_SHELL = [
   "./",
   "./index.html",

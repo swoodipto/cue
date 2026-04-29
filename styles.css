@@ -529,6 +529,11 @@ svg {
     color: var(--color-text);
 }
 
+.control-val:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .control-unit {
     font-size: 12px;
     font-family: var(--font-mono);
@@ -574,6 +579,19 @@ svg {
     border: 2px solid #1a1a1a;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.slider:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.slider:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+}
+
+.slider:disabled::-moz-range-thumb {
+    cursor: not-allowed;
 }
 
 /* ── Color swatch (background color picker) ─────────────────── */
