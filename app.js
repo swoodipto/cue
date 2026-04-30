@@ -111,6 +111,10 @@ const OVERLAY_SIZE_MIN = 1;
 const OVERLAY_EDGE_DISTANCE_MIN = 0;
 const OVERLAY_AUTO_FILL = 0.92;
 const OVERLAY_TEXT_LINE_HEIGHT = 1.15;
+const OVERLAY_TEXT_KERNING_EM = -0.045; // Negative values tighten text; scales with font size.
+const OVERLAY_TEXT_SEGMENTER = typeof Intl !== "undefined" && Intl.Segmenter
+  ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+  : null;
 const OVERLAY_FALLBACK_LOGO_ASPECT = 1;
 const OVERLAY_AREA_INSET_RATIO = 0.14;
 
@@ -1148,7 +1152,10 @@ function render() {
     paintGrid(ctx, cW, cH, resolvedPatternColor, scale, patternBlendMode, opacity);
   }
 
-  // 3 — Build the clipped image surface, then derive a shadow layer from its alpha.
+  // 3 — Optional overlay, drawn behind the pasted image.
+  paintOverlay(ctx, layout);
+
+  // 4 — Build the clipped image surface, then derive a shadow layer from its alpha.
   //
   //     Why offscreen?  We want the image clipped cleanly while still being
   //     able to contract or expand the shadow silhouette before blur.
@@ -1174,8 +1181,6 @@ function render() {
     );
   }
   ctx.drawImage(imgOff, ix, iy, dW, dH);
-
-  paintOverlay(ctx, layout);
 
   ctx.restore();
 }
@@ -1442,11 +1447,10 @@ function paintOverlay(ctx, layout) {
     ctx.font = `600 ${fontSize}px ${getOverlayFontFamily()}`;
     ctx.fillStyle = overlayColor;
     ctx.textBaseline = "top";
-    const metrics = ctx.measureText(overlayText);
-    const boxW = Math.ceil(metrics.width);
+    const boxW = Math.ceil(measureOverlayTextWidth(ctx, overlayText, fontSize));
     const boxH = Math.ceil(fontSize * 1.15);
     const { x, y } = getOverlayPlacement(overlayPosition, boxW, boxH, layout);
-    ctx.fillText(overlayText, x, y);
+    drawOverlayText(ctx, overlayText, x, y, fontSize);
     ctx.restore();
     return;
   }
@@ -1467,10 +1471,75 @@ function getOverlayFontFamily() {
   return OVERLAY_FONT_STACKS[state.settings.overlayFont] || OVERLAY_FONT_STACKS["sans-serif"];
 }
 
+function getOverlayTextGraphemes(text) {
+  if (OVERLAY_TEXT_SEGMENTER) {
+    return [...OVERLAY_TEXT_SEGMENTER.segment(text)].map((part) => part.segment);
+  }
+  return Array.from(text);
+}
+
+function getOverlayTextKerning(fontSize) {
+  return fontSize * OVERLAY_TEXT_KERNING_EM;
+}
+
+function hasCanvasLetterSpacing(renderCtx) {
+  return "letterSpacing" in renderCtx;
+}
+
+function withOverlayTextKerning(renderCtx, fontSize, callback) {
+  if (!hasCanvasLetterSpacing(renderCtx)) {
+    return callback(false);
+  }
+
+  const previousLetterSpacing = renderCtx.letterSpacing;
+  renderCtx.letterSpacing = `${getOverlayTextKerning(fontSize)}px`;
+  try {
+    return callback(true);
+  } finally {
+    renderCtx.letterSpacing = previousLetterSpacing;
+  }
+}
+
+function measureOverlayTextWidth(renderCtx, text, fontSize) {
+  const graphemes = getOverlayTextGraphemes(text);
+  if (!graphemes.length) return 0;
+
+  return withOverlayTextKerning(renderCtx, fontSize, (usesNativeSpacing) => {
+    if (usesNativeSpacing) {
+      return Math.max(1, renderCtx.measureText(text).width);
+    }
+
+    const kerning = getOverlayTextKerning(fontSize);
+    const glyphWidth = graphemes.reduce(
+      (total, glyph) => total + renderCtx.measureText(glyph).width,
+      0
+    );
+    return Math.max(1, glyphWidth + kerning * (graphemes.length - 1));
+  });
+}
+
+function drawOverlayText(renderCtx, text, x, y, fontSize) {
+  const graphemes = getOverlayTextGraphemes(text);
+
+  withOverlayTextKerning(renderCtx, fontSize, (usesNativeSpacing) => {
+    if (usesNativeSpacing) {
+      renderCtx.fillText(text, x, y);
+      return;
+    }
+
+    const kerning = getOverlayTextKerning(fontSize);
+    let cursorX = x;
+    graphemes.forEach((glyph) => {
+      renderCtx.fillText(glyph, cursorX, y);
+      cursorX += renderCtx.measureText(glyph).width + kerning;
+    });
+  });
+}
+
 function measureOverlayTextWidthAtFontSize(text, fontSize) {
   ctx.save();
   ctx.font = `600 ${fontSize}px ${getOverlayFontFamily()}`;
-  const width = ctx.measureText(text).width;
+  const width = measureOverlayTextWidth(ctx, text, fontSize);
   ctx.restore();
   return width;
 }
