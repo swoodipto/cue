@@ -319,12 +319,18 @@ svg {
     border-bottom: none;
 }
 
+/* .panel-section:nth-last-child(2) {
+    margin-bottom: 76px;
+    border-bottom: none;
+}
+
 .panel-section.bottom {
-    position: absolute;
-    width: 100%;
+    position: fixed;
+    background: rgba(255, 255, 255, 1);
+    width: stretch;
     bottom: 0;
     border-top: 1px solid var(--color-border);
-}
+} */
 
 .section-label {
     font-size: 10px;
