@@ -22,14 +22,14 @@
     --font-mono:
         ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo, monospace;
 
-    --color-bg: #f5f5f5;
-    --color-panel: #ffffff;
+    --color-bg: #eeeeee;
+    --color-panel: #e5e5e5;
     --color-header: #ffffff;
     --color-border: #e5e5e5;
     --color-border-focus: #b0b0b0;
 
     --color-text: #1a1a1a;
-    --color-text-muted: #777777;
+    --color-text-muted: #939393;
     --color-text-faint: #b0b0b0;
 
     --color-chip-bg: #f0f0f0;
@@ -38,7 +38,7 @@
     --color-chip-active-text: #ffffff;
 
     --header-h: 52px;
-    --panel-w: 280px;
+    --panel-w: 320px;
     --radius-chip: 99px;
 }
 
@@ -162,6 +162,8 @@ svg {
     background: var(--color-bg);
     overflow: auto;
     padding: 0 40px;
+    border-right: 1.6px solid #ffffff;
+    box-shadow: inset -4px 0 12px -2px #ffffff;
 }
 
 /* ── Canvas frame ───────────────────────────────────────────── */
@@ -209,11 +211,10 @@ svg {
     line-height: 0;
     max-width: 100%;
     max-height: 100%;
-    box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.06),
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06),
         0 4px 16px rgba(0, 0, 0, 0.08),
         0 12px 40px rgba(0, 0, 0, 0.06);
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    transition: box-shadow 0.15s easetransform 0.15s ease;
 }
 
 .frame canvas {
@@ -288,12 +289,13 @@ svg {
     width: var(--panel-w);
     flex-shrink: 0;
     background: var(--color-panel);
-    border-left: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     gap: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    box-shadow: inset .2px 0 0 0 rgb(65 64 73 / 73%),
+                inset 6px 0 12px -4px #6a6a792a;
 }
 
 .panel::-webkit-scrollbar {
@@ -305,7 +307,8 @@ svg {
     flex-direction: column;
     gap: 14px;
     padding: 24px 20px;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid #ffffffdc;
+    box-shadow: inset 0 -1.2px 0 0 #00000010;
 }
 
 .panel-section.rowing {
@@ -446,12 +449,12 @@ svg {
 /* Individual chip button — rectangular rounded, not pill-shaped */
 .chip {
     padding: 7px 14px;
-    border-radius: 10px;
-    background: #f7f7f7;
-    border: 1px solid #e2e2e2;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0);
     color: var(--color-text-muted);
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 500;
     font-family: var(--font);
     white-space: nowrap;
     line-height: 1;
@@ -459,17 +462,19 @@ svg {
 }
 
 .chip:hover {
-    background: #efefef;
+    background: #e7e6e6;
     color: var(--color-text);
     border-color: #d0d0d0;
 }
 
 .chip.active {
-    background: #ffffff;
+    background: #eeeded;
     color: var(--color-text);
-    border-color: #c0c0c0;
-    font-weight: 500;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    border-color: #ffffff;
+    box-shadow: inset 0 0 12px #ffffff,
+                        0 0 1.6px 0 rgba(0, 0, 0, 0.4),
+                        0 6px 10px -2px rgba(0, 0, 0, 0.1),
+                        0 0 0 0.4px rgba(0, 0, 0, 0.02);
 }
 
 .chip:disabled {
@@ -552,10 +557,10 @@ svg {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 3px;
-    border-radius: 99px;
     outline: none;
     cursor: pointer;
+    border-radius: 8px;
+    height: 30px;
     /* filled portion is dark, unfilled is light — updated via --pct in JS */
     background: linear-gradient(
         to right,
@@ -568,8 +573,8 @@ svg {
 
 .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     background: #ffffff;
     border: 2px solid #1a1a1a;
