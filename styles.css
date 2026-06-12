@@ -311,6 +311,20 @@ svg {
                 inset 6px 0 14px -4px #4b4b5829;
 }
 
+.preview-area {
+    margin: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1.6px #ffffff inset, 0 0 20px 0 #ffffff73 inset,
+                0 0 0 1px #0000001c,
+                0 2px 3px 0 #0000001c,
+                0 8px 24px -8px #0000001c;
+}
+
+.panel {
+    padding-right: 20px;
+    box-shadow: none;
+}
+
 body:before {
   content: "";
   background-color: transparent;
