@@ -947,6 +947,7 @@ const els = {
   resetBtn:      $("resetBtn"),
   imageLabel:    $("imageLabel"),
   sectionStyle:  $("section-style"),
+  sectionElement: $("section-element"),
   sectionExport: $("section-export"),
   sectionFeedback: $("section-feedback"),
   // Appearance controls
@@ -2004,6 +2005,7 @@ function showPreview() {
   els.panel.classList.remove("hidden");
   els.resetBtn.classList.remove("hidden");
   els.sectionStyle.classList.remove("hidden");
+  els.sectionElement.classList.remove("hidden");
   els.sectionExport.classList.remove("hidden");
   els.sectionFeedback.classList.remove("hidden");
   updateSoundUI();
@@ -2014,7 +2016,7 @@ function showPreview() {
   void els.frame.offsetWidth;
   requestAnimationFrame(() => {
     els.frame.classList.add("enter-animate");
-    els.canvasActions.classList.add("enter-animate");
+    // els.canvasActions.classList.add("enter-animate");
   });
 }
 

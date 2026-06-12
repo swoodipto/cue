@@ -36,7 +36,9 @@
                     </div>
                     <div class="canvas-actions" id="canvasActions">
                         <span class="canvas-actions-label">Paste Image with ⌘+V / Ctrl+V, Drop an Image OR</span>
-                        <button class="canvas-browse-btn" id="canvasBrowseBtn">Upload Image</button>
+                        <div class="btn-wrapper" style="width: auto; height: auto; padding: 0;">
+                            <button class="canvas-browse-btn" id="canvasBrowseBtn" style="width: auto; height: 36px; align-items: flex-start; justify-content: flex-start; padding: 6px 28px 0 6px; font-size: 12px;">Upload</button>
+                        </div>
                     </div>
                     <!--<p class="frame-hint">Live preview · 2× export</p>-->
                 </div>
@@ -62,204 +64,9 @@
                     </button>
                 </section>
 
-                <!-- ── Appearance (hidden until image loaded) ─────── -->
-                <section class="panel-section hidden" id="section-style">
-                    <p class="section-label">Scene Appearance</p>
-
-                    <!-- Canvas size -->
-                    <div class="control-group">
-                        <span class="control-label">Canvas</span>
-                        <div class="chip-row" id="ratioPicker">
-                            <button class="chip active" data-ratio="free">Free</button>
-                            <button class="chip" data-ratio="4:3">4:3</button>
-                            <button class="chip" data-ratio="16:9">16:9</button>
-                            <button class="chip" data-ratio="1:1">1:1</button>
-                            <button class="chip" data-ratio="9:16">9:16</button>
-                            <button class="chip" data-ratio="3:4">3:4</button>
-                        </div>
-                    </div>
-
-                    <!-- Background type + colour / gradient / blur -->
-                    <div class="control-group">
-                        <span class="control-label">Background</span>
-                        <div class="chip-row" id="bgTypePicker">
-                            <button class="chip active" data-bg-type="solid">Solid</button>
-                            <button class="chip" data-bg-type="gradient">Gradient</button>
-                            <button class="chip" data-bg-type="blur">Blur</button>
-                        </div>
-                    </div>
-
-                    <!-- Background colour (only shown when solid) -->
-                    <div class="control-group" id="bgColorControl">
-                        <div class="control-row">
-                            <span class="control-label">Color</span>
-                            <input
-                                type="color"
-                                id="bgColorInput"
-                                class="color-swatch"
-                                value="#ffffff"
-                                title="Pick background color"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Gradient colours (only shown when gradient background) -->
-                    <div class="control-group hidden" id="bgGradientControl">
-                        <div class="control-row">
-                            <span class="control-label">Start color</span>
-                            <input
-                                type="color"
-                                id="bgGradientStartInput"
-                                class="color-swatch"
-                                value="#d8e5f2"
-                                title="Pick gradient start color"
-                            />
-                        </div>
-                        <div class="control-row">
-                            <span class="control-label">End color</span>
-                            <input
-                                type="color"
-                                id="bgGradientEndInput"
-                                class="color-swatch"
-                                value="#f7d8c3"
-                                title="Pick gradient end color"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Gradient direction (only shown when gradient background) -->
-                    <div class="control-group hidden" id="bgGradientDirectionControl">
-                        <span class="control-label">Direction</span>
-                        <div class="chip-row direction-chip-row" id="bgGradientDirectionPicker">
-                            <button class="chip" data-gradient-direction="to-top" title="To top">&uarr;</button>
-                            <button class="chip" data-gradient-direction="to-top-right" title="To top right">&nearr;</button>
-                            <button class="chip" data-gradient-direction="to-right" title="To right">&rarr;</button>
-                            <button class="chip active" data-gradient-direction="to-bottom-right" title="To bottom right">&searr;</button>
-                            <button class="chip" data-gradient-direction="to-bottom" title="To bottom">&darr;</button>
-                            <button class="chip" data-gradient-direction="to-bottom-left" title="To bottom left">&swarr;</button>
-                            <button class="chip" data-gradient-direction="to-left" title="To left">&larr;</button>
-                            <button class="chip" data-gradient-direction="to-top-left" title="To top left">&nwarr;</button>
-                        </div>
-                    </div>
-
-                    <!-- Blur amount slider (only shown when blur background) -->
-                    <div class="control-group hidden" id="bgBlurControl">
-                        <div class="control-row">
-                            <span class="control-label">Blur amount</span>
-                            <span class="val-group">
-                                <input
-                                    type="number"
-                                    class="control-val"
-                                    id="blurVal"
-                                    value="20"
-                                    min="4"
-                                    max="80"
-                                    step="2"
-                                />
-                                <span class="control-unit">px</span>
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            class="slider"
-                            id="blurSlider"
-                            min="4"
-                            max="80"
-                            value="20"
-                            step="2"
-                        />
-                    </div>
-
-                    <!-- Pattern -->
-                    <div class="control-group">
-                        <span class="control-label">Pattern</span>
-                        <div class="chip-row" id="patternPicker">
-                            <button class="chip active" data-pattern="none">None</button>
-                            <button class="chip" data-pattern="noise">Noise</button>
-                            <button class="chip" data-pattern="dots">Dots</button>
-                            <button class="chip" data-pattern="grid">Grid</button>
-                        </div>
-                    </div>
-
-                    <!-- Pattern colour (only shown when a pattern is enabled) -->
-                    <div class="control-group hidden" id="patternColorControl">
-                        <div class="control-row">
-                            <span class="control-label">Color</span>
-                            <input
-                                type="color"
-                                id="patternColorInput"
-                                class="color-swatch"
-                                value="#000000"
-                                title="Pick pattern color"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Pattern scale slider (only shown when a pattern is enabled) -->
-                    <div class="control-group hidden" id="patternScaleControl">
-                        <div class="control-row">
-                            <span class="control-label">Scale</span>
-                            <span class="val-group">
-                                <input
-                                    type="number"
-                                    class="control-val"
-                                    id="patternScaleVal"
-                                    value="10"
-                                    min="1"
-                                    max="100"
-                                    step="1"
-                                />
-                                <span class="control-unit">×</span>
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            class="slider"
-                            id="patternScaleSlider"
-                            min="1"
-                            max="100"
-                            value="10"
-                            step="1"
-                        />
-                    </div>
-
-                    <!-- Pattern blend mode (only shown when a pattern is enabled) -->
-                    <div class="control-group hidden" id="patternBlendControl">
-                        <span class="control-label">Blend</span>
-                        <div class="chip-row" id="patternBlendPicker">
-                            <button class="chip active" data-blend="normal">Normal</button>
-                            <button class="chip" data-blend="overlay">Overlay</button>
-                            <button class="chip" data-blend="screen">Screen</button>
-                        </div>
-                    </div>
-
-                    <!-- Pattern opacity slider (only shown when a pattern is enabled) -->
-                    <div class="control-group hidden" id="patternOpacityControl">
-                        <div class="control-row">
-                            <span class="control-label">Opacity</span>
-                            <span class="val-group">
-                                <input
-                                    type="number"
-                                    class="control-val"
-                                    id="patternOpacityVal"
-                                    value="50"
-                                    min="1"
-                                    max="100"
-                                    step="1"
-                                />
-                                <span class="control-unit"></span>
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            class="slider"
-                            id="patternOpacitySlider"
-                            min="1"
-                            max="100"
-                            value="50"
-                            step="1"
-                        />
-                    </div>
+                <!-- ── Element (hidden until image loaded) ────────────── -->
+                <section class="panel-section hidden" id="section-element">
+                    <p class="section-label">Subject</p>
 
                     <!-- Padding slider -->
                     <div class="control-group">
@@ -509,11 +316,212 @@
                     </div>
                 </section>
 
+                <!-- ── Appearance (hidden until image loaded) ─────── -->
+                <section class="panel-section hidden" id="section-style">
+                    <p class="section-label">Backdrop</p>
+
+                    <!-- Canvas size -->
+                    <div class="control-group">
+                        <span class="control-label">Canvas</span>
+                        <div class="chip-row" id="ratioPicker">
+                            <button class="chip active" data-ratio="free">Free</button>
+                            <button class="chip" data-ratio="4:3">4:3</button>
+                            <button class="chip" data-ratio="16:9">16:9</button>
+                            <button class="chip" data-ratio="1:1">1:1</button>
+                            <button class="chip" data-ratio="9:16">9:16</button>
+                            <button class="chip" data-ratio="3:4">3:4</button>
+                        </div>
+                    </div>
+
+                    <!-- Background type + colour / gradient / blur -->
+                    <div class="control-group">
+                        <span class="control-label">Background</span>
+                        <div class="chip-row" id="bgTypePicker">
+                            <button class="chip active" data-bg-type="solid">Solid</button>
+                            <!-- <button class="chip" data-bg-type="gradient">Gradient</button> -->
+                            <button class="chip" data-bg-type="blur">Blur</button>
+                        </div>
+                    </div>
+
+                    <!-- Background colour (only shown when solid) -->
+                    <div class="control-group" id="bgColorControl">
+                        <div class="control-row">
+                            <span class="control-label">Color</span>
+                            <input
+                                type="color"
+                                id="bgColorInput"
+                                class="color-swatch"
+                                value="#ffffff"
+                                title="Pick background color"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Gradient colours (only shown when gradient background) -->
+                    <div class="control-group hidden" id="bgGradientControl">
+                        <div class="control-row">
+                            <span class="control-label">Start color</span>
+                            <input
+                                type="color"
+                                id="bgGradientStartInput"
+                                class="color-swatch"
+                                value="#d8e5f2"
+                                title="Pick gradient start color"
+                            />
+                        </div>
+                        <div class="control-row">
+                            <span class="control-label">End color</span>
+                            <input
+                                type="color"
+                                id="bgGradientEndInput"
+                                class="color-swatch"
+                                value="#f7d8c3"
+                                title="Pick gradient end color"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Gradient direction (only shown when gradient background) -->
+                    <div class="control-group hidden" id="bgGradientDirectionControl">
+                        <span class="control-label">Direction</span>
+                        <div class="chip-row direction-chip-row" id="bgGradientDirectionPicker">
+                            <button class="chip" data-gradient-direction="to-top" title="To top">&uarr;</button>
+                            <button class="chip" data-gradient-direction="to-top-right" title="To top right">&nearr;</button>
+                            <button class="chip" data-gradient-direction="to-right" title="To right">&rarr;</button>
+                            <button class="chip active" data-gradient-direction="to-bottom-right" title="To bottom right">&searr;</button>
+                            <button class="chip" data-gradient-direction="to-bottom" title="To bottom">&darr;</button>
+                            <button class="chip" data-gradient-direction="to-bottom-left" title="To bottom left">&swarr;</button>
+                            <button class="chip" data-gradient-direction="to-left" title="To left">&larr;</button>
+                            <button class="chip" data-gradient-direction="to-top-left" title="To top left">&nwarr;</button>
+                        </div>
+                    </div>
+
+                    <!-- Blur amount slider (only shown when blur background) -->
+                    <div class="control-group hidden" id="bgBlurControl">
+                        <div class="control-row">
+                            <span class="control-label">Blur amount</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="blurVal"
+                                    value="20"
+                                    min="4"
+                                    max="80"
+                                    step="2"
+                                />
+                                <span class="control-unit">px</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="blurSlider"
+                            min="4"
+                            max="80"
+                            value="20"
+                            step="2"
+                        />
+                    </div>
+
+                    <!-- Pattern -->
+                    <div class="control-group">
+                        <span class="control-label">Pattern</span>
+                        <div class="chip-row" id="patternPicker">
+                            <button class="chip active" data-pattern="none">None</button>
+                            <button class="chip" data-pattern="noise">Noise</button>
+                            <button class="chip" data-pattern="dots">Dots</button>
+                            <button class="chip" data-pattern="grid">Grid</button>
+                        </div>
+                    </div>
+
+                    <!-- Pattern colour (only shown when a pattern is enabled) -->
+                    <div class="control-group hidden" id="patternColorControl">
+                        <div class="control-row">
+                            <span class="control-label">Color</span>
+                            <input
+                                type="color"
+                                id="patternColorInput"
+                                class="color-swatch"
+                                value="#000000"
+                                title="Pick pattern color"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Pattern scale slider (only shown when a pattern is enabled) -->
+                    <div class="control-group hidden" id="patternScaleControl">
+                        <div class="control-row">
+                            <span class="control-label">Scale</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="patternScaleVal"
+                                    value="10"
+                                    min="1"
+                                    max="100"
+                                    step="1"
+                                />
+                                <span class="control-unit">×</span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="patternScaleSlider"
+                            min="1"
+                            max="100"
+                            value="10"
+                            step="1"
+                        />
+                    </div>
+
+                    <!-- Pattern blend mode (only shown when a pattern is enabled) -->
+                    <div class="control-group hidden" id="patternBlendControl">
+                        <span class="control-label">Blend</span>
+                        <div class="chip-row" id="patternBlendPicker">
+                            <button class="chip active" data-blend="normal">Normal</button>
+                            <button class="chip" data-blend="overlay">Overlay</button>
+                            <button class="chip" data-blend="screen">Screen</button>
+                        </div>
+                    </div>
+
+                    <!-- Pattern opacity slider (only shown when a pattern is enabled) -->
+                    <div class="control-group hidden" id="patternOpacityControl">
+                        <div class="control-row">
+                            <span class="control-label">Opacity</span>
+                            <span class="val-group">
+                                <input
+                                    type="number"
+                                    class="control-val"
+                                    id="patternOpacityVal"
+                                    value="50"
+                                    min="1"
+                                    max="100"
+                                    step="1"
+                                />
+                                <span class="control-unit"></span>
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider"
+                            id="patternOpacitySlider"
+                            min="1"
+                            max="100"
+                            value="50"
+                            step="1"
+                        />
+                    </div>
+                </section>
+
                 <!-- ── Export (hidden until image loaded) ─────────── -->
                 <section class="panel-section hidden" id="section-export">
                     <p class="section-label">Export</p>
                     <div class="export-row">
-                        <button class="export-btn" id="exportBtn">
+                        <div class="btn-wrapper">
+                            <button class="export-btn" id="exportBtn">
                             <span class="export-icon">
                                 <svg viewBox="0 -2 14 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M1 10L7 16M7 16L13 10M7 16L7 1" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
@@ -521,6 +529,9 @@
                             </span>
                             Download PNG
                         </button>
+                        </div>
+
+                        <div class="btn-wrapper">
                         <button
                             class="copy-btn"
                             id="copyBtn"
@@ -534,12 +545,14 @@
                             </svg>
 
                         </button>
+                        </div>
+
                     </div>
                     <p class="export-note">2× resolution · No watermark</p>
                 </section>
 
                 <section class="panel-section hidden" id="section-feedback">
-                    <p class="section-label">Feedback</p>
+                    <p class="section-label">Interface</p>
                     <div class="control-group">
                         <span class="control-label">Sounds</span>
                         <div class="chip-row" id="soundPicker">
