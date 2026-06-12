@@ -22,8 +22,9 @@
     --font-mono:
         ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo, monospace;
 
-    --color-bg: #eeeeee;
-    --color-panel: #e5e5e5;
+    --color-bg: #eeece6;
+    /* --color-panel: #e7e7e7; */
+    --color-panel: #e2e1dc;
     --color-header: #ffffff;
     --color-border: #e5e5e5;
     --color-border-focus: #b0b0b0;
@@ -48,7 +49,7 @@ html,
 body {
     height: 100%;
     font-family: var(--font);
-    background: var(--color-bg);
+    background: var(--color-panel);
     color: var(--color-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -118,28 +119,29 @@ svg {
     vertical-align: middle;
     cursor: default;
     user-select: none;
+    font-weight: 500;
+     color: #c0bebc;
+     text-shadow: 0 0.9px 1px #fffffff3, 0 -0.5px 0.6px #333333f5;`
 }
 
 .logo-mark {
     font-size: 32px;
-    color: #1a1a1a;
     line-height: 1;
 }
 
 .logo-text {
     font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    color: var(--color-text);
+    letter-spacing: -0.01em;
     text-transform: lowercase;
     line-height: 1em;
 }
 
 .header-tagline {
-    font-size: 13px;
+    font-size: 11px;
     color: var(--color-text-muted);
     text-transform: lowercase;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
+    display: none;
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -162,8 +164,7 @@ svg {
     background: var(--color-bg);
     overflow: auto;
     padding: 0 40px;
-    border-right: 1.6px solid #ffffff;
-    box-shadow: inset -4px 0 12px -2px #ffffff;
+    box-shadow: -1px 0 0 0 #ffffff inset, -2px 0 12px 1px #ffffff79;
 }
 
 /* ── Canvas frame ───────────────────────────────────────────── */
@@ -288,14 +289,36 @@ svg {
     position: relative;
     width: var(--panel-w);
     flex-shrink: 0;
-    background: var(--color-panel);
+    /* background: var(--color-panel); */
+    background: transparent;
     display: flex;
     flex-direction: column;
     gap: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     box-shadow: inset .2px 0 0 0 rgb(65 64 73 / 73%),
-                inset 6px 0 12px -4px #6a6a792a;
+                inset 6px 0 14px -4px #4b4b5829;
+}
+
+body:before {
+  content: "";
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 90px;
+  opacity: .45;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  position: absolute;
+  z-index: 0;
+}
+
+.panel-wrapper {
+    position: relative;
+    z-index: 1;
+     /* Ensure content is above the noise overlay */
 }
 
 .panel::-webkit-scrollbar {
@@ -307,7 +330,7 @@ svg {
     flex-direction: column;
     gap: 14px;
     padding: 24px 20px;
-    border-bottom: 1px solid #ffffffdc;
+    border-bottom: 1px solid #ffffffb7;
     box-shadow: inset 0 -1.2px 0 0 #00000010;
 }
 
@@ -320,6 +343,7 @@ svg {
 
 .panel-section:last-child {
     border-bottom: none;
+    box-shadow: none;
 }
 
 /* .panel-section:nth-last-child(2) {
@@ -341,6 +365,9 @@ svg {
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--color-text-faint);
+    text-shadow: 0 0.8px #ffffffee, 0 -0.5px #333333d2;
+    font-weight: 500;
+    user-select: none;
 }
 
 .preview-area.drag-over .frame {
@@ -448,10 +475,11 @@ svg {
 
 /* Individual chip button — rectangular rounded, not pill-shaped */
 .chip {
+    position: relative;
     padding: 7px 14px;
     border-radius: 8px;
     background: rgba(0,0,0,0.03);
-    border: 1px solid rgba(0,0,0,0);
+    border: 1.4px solid rgba(0,0,0,0);
     color: var(--color-text-muted);
     font-size: 13px;
     font-weight: 500;
@@ -462,19 +490,33 @@ svg {
 }
 
 .chip:hover {
-    background: #e7e6e6;
+    background: rgba(255,255,255,0.08);
     color: var(--color-text);
-    border-color: #d0d0d0;
+    border-color: #c9c9c9;
+}
+
+.chip:active {
+    border-color: transparent;
+    box-shadow: 0 -1.4px 1px 0 #ffffff inset, 0 0 0 1.2px #00000024 inset, 0 4px 10px -4px #848484d4 inset;
 }
 
 .chip.active {
-    background: #eeeded;
+    /* background: #ebebeb;
     color: var(--color-text);
     border-color: #ffffff;
-    box-shadow: inset 0 0 12px #ffffff,
-                        0 0 1.6px 0 rgba(0, 0, 0, 0.4),
-                        0 6px 10px -2px rgba(0, 0, 0, 0.1),
-                        0 0 0 0.4px rgba(0, 0, 0, 0.02);
+    box-shadow: inset 0 0 6px #ffffff,
+                        0 0 1px 0 rgba(0, 0, 0, 0.4),
+                        0 8px 12px -4px rgba(0, 0, 0, 0.1),
+                        0 0 0 0.2px rgba(0, 0, 0, 0.02); */
+/* background: #f1ede2;
+    color: var(--color-text);
+    border-color: #ffffff;
+    box-shadow: inset 0 4px 10px #facc5054, 0 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 12px -4px rgba(0, 0, 0, 0.1), 0 0 0 0.2px rgba(0, 0, 0, 0.02), 0 -2px 4px 0 #efc03e42, 0 -4px 24px 0 #ffbb0030; */
+
+    background: #f0e2da;
+    color: var(--color-text);
+    border-color: #ffffff8b;
+    box-shadow: inset 0 4px 10px #fa915054, 0 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 12px -4px rgba(0, 0, 0, 0.1), 0 0 0 0.2px rgba(0, 0, 0, 0.02), 0 -2px 2px 0 #ff42001c, 0 -2px 26px 0 #ff370036;
 }
 
 .chip:disabled {
@@ -559,26 +601,27 @@ svg {
     width: 100%;
     outline: none;
     cursor: pointer;
-    border-radius: 8px;
-    height: 30px;
-    /* filled portion is dark, unfilled is light — updated via --pct in JS */
+    border-radius: 2px;
+    height: 4px;
     background: linear-gradient(
         to right,
-        var(--color-text) 0%,
-        var(--color-text) var(--pct, 50%),
-        var(--color-border) var(--pct, 50%),
-        var(--color-border) 100%
+        #ff6f27 0%,
+        #ff6f27 var(--pct, 50%),
+        rgba(0,0,0,0.06) var(--pct, 50%),
+        rgba(0,0,0,0.06) 100%
     );
+    box-shadow: 0 1px 2px 0 #0000004d inset,
+                0 -1px 1px 0 #ffffffd1 inset;
 }
+ 
 
 .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
+    width: 5px;
+    height: 16px;
+    border-radius: 2px;
     background: #ffffff;
-    border: 2px solid #1a1a1a;
-    cursor: pointer;
+    cursor: ew-resize;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
@@ -588,7 +631,7 @@ svg {
     border-radius: 50%;
     background: #ffffff;
     border: 2px solid #1a1a1a;
-    cursor: pointer;
+    cursor: ew-resize;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
@@ -604,6 +647,71 @@ svg {
 .slider:disabled::-moz-range-thumb {
     cursor: not-allowed;
 }
+
+/* .slider {
+  -webkit-appearance: none;
+  appearance: none; 
+  width: 100%;
+  height: 24px;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.slider::-webkit-slider-runnable-track {
+  background: #0000000d;
+  border-radius: 6px;
+}
+
+.slider::-moz-range-track {
+  background: #ccc;
+  border-radius: 6px;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 24px;
+  width: 8px;
+  background-color: #fff;
+  border-radius: 2px;
+  border: 0px solid transparent;
+  box-shadow: -407px 0 0 400px #f50;
+}
+
+.slider::-moz-range-thumb {
+  width: 4px;
+  background-color: #fff;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  box-shadow: -407px 0 0 400px #f50;
+} */
+
+/* .slider {
+  overflow: hidden;
+  -webkit-appearance: none;
+  background-color: #0000000e;
+  border-radius: 6px;
+}
+
+.slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  color: transparent;
+  height: 20px;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 2px;
+  height: 14px;
+  margin-top: 3px;
+  cursor: ew-resize;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow: -396px 0 0 400px #f50;
+} */
 
 /* ── Color swatch (background color picker) ─────────────────── */
 
