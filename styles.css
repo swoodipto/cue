@@ -24,14 +24,14 @@
 
     --color-bg: #eeece6;
     /* --color-panel: #e7e7e7; */
-    --color-panel: #e2e1dc;
+    --color-panel: hsl(50, 9%, 82.5%);
     --color-header: #ffffff;
     --color-border: #e5e5e5;
     --color-border-focus: #b0b0b0;
 
     --color-text: #1a1a1a;
     --color-text-muted: #7d7d7d;
-    --color-text-faint: #a1a1a1;
+    --color-text-faint: rgb(132, 130, 124);
 
     --color-chip-bg: #f0f0f0;
     --color-chip-hover: #e8e8e8;
@@ -120,7 +120,7 @@ svg {
     cursor: default;
     user-select: none;
     font-weight: 500;
-     color: #c0bebc;
+     color: var(--color-text-faint);
      text-shadow: 0 0.9px 1px #fffffff3, 0 -0.5px 0.6px #333333f5;`
 }
 
@@ -465,6 +465,7 @@ body:before {
     color: var(--color-text-faint);
     font-family: var(--font-mono);
     line-height: 1.4;
+    text-transform: capitalize;
 }
 
 .sound-unlock {
@@ -544,9 +545,10 @@ body:before {
     box-shadow: inset 0 4px 10px #facc5054, 0 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 12px -4px rgba(0, 0, 0, 0.1), 0 0 0 0.2px rgba(0, 0, 0, 0.02), 0 -2px 4px 0 #efc03e42, 0 -4px 24px 0 #ffbb0030; */
 
     background: #f0e2da;
-    color: var(--color-text);
+    color: #b02f00;
     border-color: #ffffff8b;
     box-shadow: inset 0 4px 10px #fa915054, 0 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 12px -4px rgba(0, 0, 0, 0.1), 0 0 0 0.2px rgba(0, 0, 0, 0.02), 0 -2px 2px 0 #ff42001c, 0 -2px 26px 0 #ff370036;
+    text-shadow: 0 -1px 4px #ff4400be, 0 4px 10px #e85019e0, 2px 2px 1.6px #fff, -2px -2px 1.6px #fff;
 }
 
 .chip:disabled {
@@ -931,30 +933,34 @@ body:before {
 
 .toast-container {
     position: fixed;
-    bottom: 28px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 40px;
+    /* right: 0%; */
+    /* transform: translateX(-50%); */
     display: flex;
-    justify-content: center;
+    justify-content: right;
     align-items: center;
     width: 100%;
-    padding: 0 16px;
+    padding: 0 40px;
     z-index: 999;
     pointer-events: none;
 }
 
 .toast {
-    background: #1a1a1a;
+    /* background: #1a1a1a; */
     color: #ffffff;
     font-size: 13px;
-    padding: 10px;
-    border-radius: 10px;
+    text-transform: capitalize;
+    padding: 10px 14px;
+    /* border-radius: 10px; */
     opacity: 0;
     white-space: normal;
     max-width: 100%;
     transition:
         opacity 0.18s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18); */
+        background: #f55a1c;
+    box-shadow: 0 0 0 1px #ffffff80 inset, 0 0 12px 0 #ffffff8a inset, 0 10px 32px -10px #a03a00b3;
+    border-radius: 8px;
 }
 
 .toast.show {
@@ -1036,6 +1042,14 @@ body:before {
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         scroll-snap-type: x proximity;
+    }
+
+    .panel-wrapper {
+        display: flex;
+        flex: 0 0 max-content;
+        align-items: stretch;
+        gap: 12px;
+        height: 100%;
     }
 
     .panel-section {
