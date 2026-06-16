@@ -93,8 +93,9 @@ svg {
     font-family: var(--font);
     line-height: 1em;
     cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, color 0.12s;
     white-space: nowrap;
+    box-shadow: none;
+    transition: box-shadow 0.2s ease-in-out;
 }
 
 .reset-btn svg * {
@@ -102,13 +103,24 @@ svg {
 }
 
 .reset-btn:hover {
-    background: #ffdedec4;
-    border-color: #ffb4b4;
-    color: #e41a1a;
+    border-color: transparent;
+    background: #ffcfcf;
+    color: #8a0000;
+    box-shadow: 0 0 0 1px #ffffff91 inset, 0 0 12px 0 #fe71718a inset, 0 0 0 1px #6c000038;
 }
 
 .reset-btn:hover svg * {
-    stroke: #e41a1a;
+    stroke: #8a0000;
+}
+
+.reset-btn:active {
+    background: #ffcfcf;
+    color: #8a0000;
+    box-shadow: 0 -1.4px 1px 0 #fffffff0 inset, 0 0 0 1.2px #5b000036 inset, 0 2px 14px -2px #7700008a inset, 0 0 0 1px #6c000038;
+}
+
+.reset-btn:active svg * {
+    stroke: #8a0000;
 }
 
 .logo {
@@ -803,7 +815,8 @@ body:before {
     width: 100%;
     height: 50px;
     background: #e0deda;
-    color: var(--color-text);
+    color: var(--color-text-muted);
+    text-shadow: 0 0.8px #ffffffee, 0 -0.5px #333333ea;
     border: none;
     border-radius: 8px;
     font-size: 13px;
@@ -850,8 +863,13 @@ body:before {
     height: 16px;
 }
 
-.export-icon svg path {
-    stroke: var(--color-text);
+.btn-wrapper svg {
+    filter: drop-shadow(0 1px #ffffffee);
+}
+
+.btn-wrapper svg *,
+.btn-wrapper svg path {
+    stroke: var(--color-text-muted);
 }
 
 .btn-wrapper button.copy-btn {
