@@ -168,6 +168,7 @@ svg {
 /* ── Preview area ───────────────────────────────────────────── */
 
 .preview-area {
+    position: relative;
     flex: 1;
     min-width: 0;
     display: flex;
@@ -992,16 +993,15 @@ body:before {
 /* ── Toast ──────────────────────────────────────────────────── */
 
 .toast-container {
-    position: fixed;
-    bottom: 40px;
-    /* right: 0%; */
-    /* transform: translateX(-50%); */
+    position: absolute;
+    inset: 0;
     display: flex;
-    justify-content: right;
-    align-items: center;
+    justify-content: center;
+    align-items: flex-end;
     width: 100%;
-    padding: 0 40px;
-    z-index: 999;
+    height: 100%;
+    padding: 40px;
+    z-index: 20;
     pointer-events: none;
 }
 
