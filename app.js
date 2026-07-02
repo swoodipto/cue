@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS = {
   pattern:     "none",    // "none" | "noise" | "dots" | "grid"
   patternColor: adaptivePatternColor("#ffffff"),
   patternScale: 10,       // 1–100 (multiplier /10 for actual scale)
-  patternBlendMode: "normal", // "normal" | "overlay" | "screen"
+  patternBlendMode: "normal", // "normal" | "overlay" | "hard-light" | "screen"
   patternOpacity: 50,     // 1–100 ( /100 for actual opacity)
   canvasRatio: "free",    // "free" | "16:9" | "1:1" | "9:16" | "3:4"
   padding:     60,        // px — 0–120

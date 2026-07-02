@@ -24,7 +24,7 @@
 
     --color-bg: #eeece6;
     /* --color-panel: #e7e7e7; */
-    --color-panel: hsl(50, 9%, 82.5%);
+    --color-panel: hsl(50, 9%, 81%);
     --color-header: #ffffff;
     --color-border: #e5e5e5;
     --color-border-focus: #b0b0b0;
@@ -293,6 +293,14 @@ svg {
     white-space: nowrap;
 }
 
+.cortshuts {
+    background: #0000000b;
+    padding: 3px 6px;
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px #00000012 inset;
+    margin: 0 2px;
+}
+
 .canvas-browse-btn {
     border: none;
     border-radius: 8px;
@@ -335,6 +343,7 @@ svg {
 .panel {
     padding-right: 20px;
     box-shadow: none;
+    overflow-x: hidden;
 }
 
 body:before {
@@ -355,7 +364,7 @@ body:before {
 .panel-wrapper {
     position: relative;
     z-index: 1;
-    padding: 16px 16px 0 16px;
+    padding: 10px 16px 0 16px;
      /* Ensure content is above the noise overlay */
 }
 
@@ -366,10 +375,8 @@ body:before {
 .panel-section {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 24px 0 32px 0;
-    border-bottom: 1px solid #ffffffb7;
-    box-shadow: inset 0 -1.2px 0 0 #00000010;
+    gap: 16px;
+    padding: 16px 0 16px 0;
 }
 
 .panel-section.rowing {
@@ -381,9 +388,13 @@ body:before {
 
 .panel-section:first-child {
     padding: 24px 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #ffffffb7;
+    box-shadow: inset 0 -1.2px 0 0 #00000010;
 }
 
 .panel-section:last-child {
+    margin-bottom: 16px;
     border-bottom: none;
     box-shadow: none;
 }
@@ -402,9 +413,9 @@ body:before {
 } */
 
 .section-label {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--color-text-faint);
     text-shadow: 0 0.8px #ffffffee, 0 -0.5px #333333d2;
@@ -476,7 +487,7 @@ body:before {
 .helper-text {
     font-size: 11px;
     color: var(--color-text-faint);
-    font-family: var(--font-mono);
+    font-family: var(--font);
     line-height: 1.4;
     text-transform: capitalize;
 }
@@ -493,15 +504,14 @@ body:before {
     cursor: wait;
 }
 
-
-
 /* ── Controls ───────────────────────────────────────────────── */
 
 /* Chip row container */
 .chip-row {
-    display: flex;
+    display: grid;
     flex-wrap: wrap;
     gap: 6px;
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
 }
 
 #bgGradientDirectionPicker {
@@ -520,17 +530,25 @@ body:before {
 .chip,
 .reset-btn {
     position: relative;
-    padding: 7px 12px;
-    border-radius: 8px;
+    padding: 8px 0;
+    border-radius: 6px;
     background: rgba(0,0,0,0.03);
     border: 1.4px solid rgba(0,0,0,0);
     color: var(--color-text-muted);
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 600;
     font-family: var(--font);
     white-space: nowrap;
     line-height: 1;
     transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+}
+
+.reset-btn {
+    padding: 7px 12px;
+    align-items: center;
 }
 
 .chip:hover {
@@ -575,6 +593,16 @@ body:before {
     gap: 10px;
 }
 
+.control-set {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 14px 14px 16px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 0 0 1px #ffffff8f, 0 1px 2px 1px #00000015;
+}
+
 /* Row: label left, value/swatch right */
 .control-row {
     display: flex;
@@ -583,9 +611,22 @@ body:before {
     gap: 8px;
 }
 
+.control-row.control-row--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.control-row.control-row--stacked > .control-row,
+.control-row.control-row--stacked > .chip-row,
+.control-row.control-row--stacked > .slider {
+    width: 100%;
+}
+
 .control-label {
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text);
     text-transform: capitalize;
 }
@@ -651,8 +692,8 @@ body:before {
     height: 4px;
     background: linear-gradient(
         to right,
-        #ff6f27 0%,
-        #ff6f27 var(--pct, 50%),
+        #ff613d 0%,
+        #ff613d var(--pct, 50%),
         rgba(0,0,0,0.06) var(--pct, 50%),
         rgba(0,0,0,0.06) 100%
     );
@@ -1116,6 +1157,18 @@ body:before {
     #section-element > .section-label {
         min-width: 54px;
         margin-top: 4px;
+    }
+
+    #section-style > .control-set {
+        min-width: min(280px, 72vw);
+        max-height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #section-style > .control-set::-webkit-scrollbar {
+        width: 0;
+        height: 0;
     }
 
     .control-group {
