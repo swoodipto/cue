@@ -954,6 +954,7 @@ const els = {
   ratioPicker:   $("ratioPicker"),
   bgTypePicker:  $("bgTypePicker"),
   bgColorInput:  $("bgColorInput"),
+  bgColorHexInput: $("bgColorHexInput"),
   bgColorControl: $("bgColorControl"),
   bgGradientControl: $("bgGradientControl"),
   bgGradientStartInput: $("bgGradientStartInput"),
@@ -964,6 +965,7 @@ const els = {
   patternPicker: $("patternPicker"),
   patternColorControl: $("patternColorControl"),
   patternColorInput: $("patternColorInput"),
+  patternColorHexInput: $("patternColorHexInput"),
   patternScaleControl: $("patternScaleControl"),
   patternScaleSlider: $("patternScaleSlider"),
   patternScaleVal: $("patternScaleVal"),
@@ -1017,6 +1019,13 @@ const SCALE = 2; // 2× backing store → retina-sharp export
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Normalise user-typed hex ("fff", "#FFAA00") to "#rrggbb", or null if invalid. */
+function normalizeHexColor(raw) {
+  let hex = String(raw).trim().replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(hex)) hex = hex.replace(/./g, (c) => c + c);
+  return /^[0-9a-f]{6}$/.test(hex) ? "#" + hex : null;
 }
 
 function getCanvasLayout(img, settings = state.settings) {
@@ -2290,8 +2299,24 @@ function initControls() {
   // Background colour
   els.bgColorInput.addEventListener("input", () => {
     state.settings.bgColor = els.bgColorInput.value;
+    els.bgColorHexInput.value = els.bgColorInput.value;
     render();
     saveSession();
+  });
+
+  // Typed hex value beside the colour swatch
+  els.bgColorHexInput.addEventListener("change", () => {
+    const hex = normalizeHexColor(els.bgColorHexInput.value);
+    if (hex) {
+      state.settings.bgColor = hex;
+      els.bgColorInput.value = hex;
+      render();
+      saveSession();
+    }
+    els.bgColorHexInput.value = state.settings.bgColor;
+  });
+  els.bgColorHexInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") els.bgColorHexInput.blur();
   });
 
   els.bgGradientStartInput.addEventListener("input", () => {
@@ -2319,8 +2344,24 @@ function initControls() {
 
   els.patternColorInput.addEventListener("input", () => {
     state.settings.patternColor = els.patternColorInput.value;
+    els.patternColorHexInput.value = els.patternColorInput.value;
     render();
     saveSession();
+  });
+
+  // Typed hex value beside the pattern colour swatch
+  els.patternColorHexInput.addEventListener("change", () => {
+    const hex = normalizeHexColor(els.patternColorHexInput.value);
+    if (hex) {
+      state.settings.patternColor = hex;
+      els.patternColorInput.value = hex;
+      render();
+      saveSession();
+    }
+    els.patternColorHexInput.value = els.patternColorInput.value;
+  });
+  els.patternColorHexInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") els.patternColorHexInput.blur();
   });
 
   // Pattern picker (none / noise / dots / grid)
@@ -2488,10 +2529,12 @@ function applySettingsToUI() {
   } = state.settings;
 
   els.bgColorInput.value = bgColor;
+  els.bgColorHexInput.value = bgColor;
   els.bgGradientStartInput.value = bgGradientStartColor;
   els.bgGradientEndInput.value = bgGradientEndColor;
   els.patternColorInput.value = patternColor
     || adaptivePatternColor(getBackgroundReferenceColor(state.settings), bgType === "blur");
+  els.patternColorHexInput.value = els.patternColorInput.value;
 
   syncChipPicker(els.bgTypePicker,  "bg-type", bgType);
   syncChipPicker(els.ratioPicker,    "ratio",   canvasRatio);

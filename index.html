@@ -351,13 +351,25 @@
                         <!-- Background colour (only shown when solid) -->
                         <div class="control-row" id="bgColorControl">
                             <span class="control-label">Color</span>
-                            <input
-                                type="color"
-                                id="bgColorInput"
-                                class="color-swatch"
-                                value="#ffffff"
-                                title="Pick background color"
-                            />
+                            <span class="val-group val-group--color">
+                                <input
+                                    type="text"
+                                    class="control-val control-val--hex"
+                                    id="bgColorHexInput"
+                                    value="#ffffff"
+                                    maxlength="7"
+                                    spellcheck="false"
+                                    autocomplete="off"
+                                    title="Background hex value"
+                                />
+                                <input
+                                    type="color"
+                                    id="bgColorInput"
+                                    class="color-swatch"
+                                    value="#ffffff"
+                                    title="Pick background color"
+                                />
+                            </span>
                         </div>
 
                         <!-- Gradient colours (only shown when gradient background) -->
@@ -443,13 +455,37 @@
                         <!-- Pattern colour (only shown when a pattern is enabled) -->
                         <div class="control-row hidden" id="patternColorControl">
                             <span class="control-label">Color</span>
-                            <input
-                                type="color"
-                                id="patternColorInput"
-                                class="color-swatch"
-                                value="#000000"
-                                title="Pick pattern color"
-                            />
+                            <span class="val-group val-group--color">
+                                <input
+                                    type="text"
+                                    class="control-val control-val--hex"
+                                    id="patternColorHexInput"
+                                    value="#000000"
+                                    maxlength="7"
+                                    spellcheck="false"
+                                    autocomplete="off"
+                                    title="Pattern hex value"
+                                />
+                                <input
+                                    type="color"
+                                    id="patternColorInput"
+                                    class="color-swatch"
+                                    value="#000000"
+                                    title="Pick pattern color"
+                                />
+                            </span>
+                        </div>
+
+
+                        <!-- Pattern blend mode (only shown when a pattern is enabled) -->
+                        <div class="control-row control-row--stacked hidden" id="patternBlendControl">
+                            <span class="control-label">Blend</span>
+                            <div class="chip-row" id="patternBlendPicker">
+                                <button class="chip active" data-blend="normal">Normal</button>
+                                <button class="chip" data-blend="overlay">Overlay</button>
+                                <button class="chip" data-blend="screen">Screen</button>
+                                <button class="chip" data-blend="hard-light" title="this button was added just to make sure the ui does not look like shit, its not much different than the other blend modes.">Hard Light</button>
+                            </div>
                         </div>
 
                         <!-- Pattern scale slider (only shown when a pattern is enabled) -->
@@ -478,17 +514,6 @@
                                 value="10"
                                 step="1"
                             />
-                        </div>
-
-                        <!-- Pattern blend mode (only shown when a pattern is enabled) -->
-                        <div class="control-row control-row--stacked hidden" id="patternBlendControl">
-                            <span class="control-label">Blend</span>
-                            <div class="chip-row" id="patternBlendPicker">
-                                <button class="chip active" data-blend="normal">Normal</button>
-                                <button class="chip" data-blend="overlay">Overlay</button>
-                                <button class="chip" data-blend="hard-light">Hard Light</button>
-                                <button class="chip" data-blend="screen">Screen</button>
-                            </div>
                         </div>
 
                         <!-- Pattern opacity slider (only shown when a pattern is enabled) -->
