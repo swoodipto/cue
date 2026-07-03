@@ -1074,6 +1074,14 @@ body:before {
 
 /* ── Responsive — mobile ────────────────────────────────────── */
 
+/* Registered so the ratio stack's top edge fade can animate
+   smoothly when it appears/disappears on scroll (mobile only). */
+@property --ratio-fade-top {
+    syntax: "<length>";
+    initial-value: 0px;
+    inherits: false;
+}
+
 @media (max-width: 680px) {
     .header-tagline {
         display: none;
@@ -1138,7 +1146,7 @@ body:before {
     .panel {
         flex: none;
         width: 100%;
-        height: 236px;
+        height: 252px;
         padding: 12px;
         overflow-x: auto;
         overflow-y: hidden;
@@ -1174,9 +1182,9 @@ body:before {
         display: flex;
         flex-direction: row;
         align-items: stretch;
-        gap: 16px;
-        padding: 12px 16px;
-        border-radius: 12px;
+        gap: 20px;
+        padding: 20px;
+        border-radius: 10px;
         background: rgba(255, 255, 255, 0.15);
         box-shadow: inset 0 0 0 1px #ffffff8f, 0 1px 2px 1px #00000015;
         scroll-snap-align: start;
@@ -1186,19 +1194,23 @@ body:before {
     .panel .section-label {
         writing-mode: vertical-rl;
         transform: rotate(180deg);
-        text-align: center;
+        text-align: left;
         font-size: 10px;
         letter-spacing: 0.08em;
     }
 
-    /* Control sets flatten into columns inside the card,
-       separated by hairlines instead of nested cards. */
+    /* Control sets flatten into rows inside the card: vertical
+       label beside its control, everything hanging from the
+       card's bottom edge. Hairlines separate the groups. */
     .panel .control-set {
         padding: 0;
         border-radius: 0;
         background: transparent;
         box-shadow: none;
         gap: 10px;
+        flex-direction: row;
+        width: auto;
+        align-items: flex-end;
     }
 
     .panel .control-set + .control-set {
@@ -1211,46 +1223,101 @@ body:before {
     .panel #patternControls {
         flex-direction: row;
         align-items: stretch;
-        gap: 16px;
+        gap: 32px;
     }
 
     .panel .control-row--stacked {
+        flex-direction: row;
+        align-items: flex-end;
         gap: 8px;
-        width: max-content;
+        width: auto;
     }
 
-    /* Color: label on top, hex + swatch beneath */
+    /* Color: swatch on top, vertical label hanging beneath */
     .panel #bgColorControl,
     .panel #patternColorControl {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: column-reverse;
+        align-items: center;
         justify-content: flex-start;
-        gap: 8px;
+        gap: 16px;
         width: max-content;
     }
 
-    /* Chips wrap into a compact 2-column grid */
+    /* Chips wrap into a compact 2-column grid; the segmented
+       pickers stack single-column beside their vertical label */
     .panel .chip-row {
         grid-template-columns: repeat(2, minmax(74px, 1fr));
-        width: 164px;
+        width: auto;
     }
 
-    .panel .chip {
-        padding: 10px 0;
+    .panel .chip-row#bgTypePicker,
+    .panel .chip-row#soundPicker,
+    .panel .chip-row#patternPicker,
+    .panel .chip-row#patternBlendPicker {
+        grid-template-columns: 1fr;
+    }
+
+    /* Canvas ratios: single-column stack capped at the card
+       height (~4 chips); the rest scrolls vertically behind a
+       bottom edge fade, with no visible scrollbar. Generous
+       interior padding (pulled back with negative margins) keeps
+       the active chip's glow inside the clip area so it falls
+       off naturally instead of getting cut. */
+    .panel .chip-row#ratioPicker {
+        grid-template-columns: 1fr;
+        max-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 12px 24px 28px 24px;
+        margin: -12px -24px 0 -24px;
+        transition: --ratio-fade-top 0.25s ease;
+        -webkit-mask-image: linear-gradient(
+            to bottom,
+            transparent 0,
+            #000 var(--ratio-fade-top, 0px),
+            #000 calc(100% - 28px),
+            transparent 100%
+        );
+        mask-image: linear-gradient(
+            to bottom,
+            transparent 0,
+            #000 var(--ratio-fade-top, 0px),
+            #000 calc(100% - 28px),
+            transparent 100%
+        );
+    }
+
+    /* Top edge fades too, but only once content is scrolled
+       under it (class toggled by a scroll listener in app.js) */
+    .panel .chip-row#ratioPicker.is-scrolled {
+        --ratio-fade-top: 24px;
+    }
+
+    .panel .chip-row#ratioPicker::-webkit-scrollbar {
+        display: none;
+    }
+
+    .panel .chip-row .chip {
+        width: 120px;
+        padding: 14px 0;
+        font-size: 12px;
     }
 
     /* ── Vertical sliders ─────────────────────────────────── */
 
     /* Subject sliders (.control-set > .slider) and backdrop
-       sliders (.control-row--stacked > .slider) become narrow
-       columns: label + value on top, vertical track below. */
+       sliders (.control-row--stacked > .slider) read as faders:
+       vertical label snug against the vertical track. */
     .panel .control-set:has(> .slider),
     .panel .control-row--stacked:has(> .slider) {
         flex: 0 0 auto;
-        width: 82px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
+        width: auto;
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 0;
     }
 
     .panel .control-set:has(> .slider) > .control-row,
@@ -1261,15 +1328,19 @@ body:before {
         gap: 6px;
     }
 
-    .panel .control-set:has(> .slider) .control-label,
-    .panel .control-row--stacked:has(> .slider) .control-label {
-        min-height: 26px;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        text-align: center;
-        white-space: normal;
-        line-height: 1.25;
+    /* All control labels run vertically, like the section label */
+    .panel .control-set .control-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        align-items: flex-start;
+        letter-spacing: 0.05em;
+    }
+
+    /* Numeric readouts and hex fields are desktop-only */
+    .panel .control-set:has(> .slider) .val-group,
+    .panel .control-row--stacked:has(> .slider) .val-group,
+    .panel .control-set .val-group .control-val--hex {
+        display: none;
     }
 
     .panel .slider {
@@ -1279,7 +1350,7 @@ body:before {
         align-self: center;
         width: 28px;
         min-width: 0;
-        height: auto;
+        height: 100%;
         min-height: 90px;
         cursor: ns-resize;
         touch-action: none;
@@ -1315,32 +1386,40 @@ body:before {
     /* ── Header card ──────────────────────────────────────── */
 
     .panel #section-header {
-        flex-direction: column;
         justify-content: space-between;
-        align-items: center;
-        min-width: 128px;
         gap: 10px;
-        padding: 18px 14px 14px 14px;
+        flex-direction: column-reverse;
+        background: transparent;
+        box-shadow: none;
+        align-items: start;
+        min-width: auto;
+        padding: 12px 0;
     }
 
     .panel #section-header .logo {
-        flex-direction: column;
         gap: 4px;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        margin-left: 4px;
     }
 
     .panel .reset-btn {
-        width: 100%;
+        width: auto;
         margin-left: 0;
         justify-content: center;
         padding: 10px 12px;
+    }
+
+    .panel .reset-btn span {
+        display: none;
     }
 
     /* ── Export card ──────────────────────────────────────── */
 
     .panel #section-export {
         display: grid;
-        grid-template-columns: auto 208px;
-        grid-template-rows: 1fr auto auto 1fr;
+        grid-template-columns: auto auto;
+        grid-template-rows: 1fr auto auto;
         column-gap: 16px;
         row-gap: 8px;
     }
@@ -1354,6 +1433,19 @@ body:before {
         grid-row: 2;
         grid-column: 2;
         width: 100%;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    /* Buttons stack like the chip columns, at a fixed width */
+    .panel #section-export .btn-wrapper {
+        flex: none;
+        width: 180px;
+    }
+
+    /* Label the copy button on mobile only */
+    .panel .copy-btn::after {
+        content: "Copy";
     }
 
     .panel #section-export .helper-text {

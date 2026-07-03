@@ -2281,6 +2281,11 @@ function initControls() {
     playSound(UI_SOUNDS.chip, 0.78);
   });
 
+  // Mobile rail: fade the ratio stack's top edge once it's scrolled
+  els.ratioPicker.addEventListener("scroll", () => {
+    els.ratioPicker.classList.toggle("is-scrolled", els.ratioPicker.scrollTop > 1);
+  }, { passive: true });
+
   // Background type
   els.bgTypePicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-bg-type]");
