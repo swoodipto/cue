@@ -1434,13 +1434,13 @@ body:before {
         grid-column: 2;
         width: 100%;
         flex-direction: column;
-        gap: 6px;
+        gap: 12px;
     }
 
     /* Buttons stack like the chip columns, at a fixed width */
     .panel #section-export .btn-wrapper {
         flex: none;
-        width: 180px;
+        width: 170px;
     }
 
     /* Label the copy button on mobile only */
