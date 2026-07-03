@@ -1085,12 +1085,14 @@ body:before {
         height: 100dvh;
     }
 
-    /* Preview pinned at top — shows upload UI or canvas */
+    /* Preview fills the leftover space above the control rail.
+       Extra bottom padding reserves room for the upload pill so the
+       canvas-fit code (which subtracts padding) never pushes it out. */
     .preview-area {
-        flex: none;
-        height: 75dvh;
-        padding: 16px;
-        border-bottom: 1px solid var(--color-border);
+        flex: 1 1 auto;
+        min-height: 0;
+        margin: 12px 12px 0 12px;
+        padding: 16px 16px 88px 16px;
         overflow: hidden;
     }
 
@@ -1098,218 +1100,264 @@ body:before {
     .frame-wrap {
         max-width: 100%;
         max-height: 100%;
+        min-height: 0;
     }
 
+    /* Static wrapper so the docked pill anchors to the preview
+       area; the frame takes over the above-the-noise stacking. */
+    .frame-wrap {
+        position: static;
+        gap: 0;
+    }
+
+    .frame {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Upload pill docks to the bottom of the preview so tall
+       canvases can never push it out of view. */
     .canvas-actions {
-        width: 100%;
-        max-width: min(100%, 420px);
-        justify-content: space-between;
-        padding: 10px 12px;
-        border-radius: 18px;
+        position: absolute;
+        bottom: 16px;
+        left: 0;
+        right: 0;
+        width: fit-content;
+        margin: 0 auto;
+        z-index: 2;
+        padding: 8px;
+        border-radius: 14px;
     }
 
     .canvas-actions-label {
         display: none;
     }
 
-    .canvas-browse-btn {
-        padding: 8px 12px;
-        font-size: 11px;
-    }
+    /* ── Panel → horizontal card rail ─────────────────────── */
 
-    /* Panel becomes a horizontal control rail */
     .panel {
         flex: none;
         width: 100%;
-        height: 25dvh;
-        border-left: none;
-        border-top: 1px solid var(--color-border);
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        gap: 12px;
-        padding: 10px 16px;
+        height: 236px;
+        padding: 12px;
         overflow-x: auto;
         overflow-y: hidden;
+        overscroll-behavior-x: contain;
         -webkit-overflow-scrolling: touch;
         scroll-snap-type: x proximity;
-    }
-
-    .panel-wrapper {
-        display: flex;
-        flex: 0 0 max-content;
-        align-items: stretch;
-        gap: 12px;
-        height: 100%;
-    }
-
-    .panel-section {
-        flex: 0 0 auto;
-        min-width: 220px;
-        max-width: 82vw;
-        height: 100%;
-        padding: 12px 14px;
-        gap: 10px;
-        border-bottom: none;
-        border: 1px solid var(--color-border);
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.72);
-        scroll-snap-align: start;
-        overflow: hidden;
-    }
-
-    .panel-section.rowing {
-        min-width: 150px;
-        justify-content: center;
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .panel-section.bottom {
-        position: static;
-        width: auto;
-        bottom: auto;
-        border-top: 1px solid var(--color-border);
-        min-width: 132px;
-        justify-content: center;
-    }
-
-    #section-style,
-    #section-element {
-        min-width: max-content;
-        display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(150px, 38vw);
-        align-content: start;
-        gap: 12px;
-    }
-
-    #section-style > .section-label,
-    #section-element > .section-label {
-        min-width: 54px;
-        margin-top: 4px;
-    }
-
-    #section-style > .control-set {
-        min-width: min(280px, 72vw);
-        max-height: 100%;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    #section-style > .control-set::-webkit-scrollbar {
-        width: 0;
-        height: 0;
-    }
-
-    .control-group {
-        gap: 8px;
-        min-width: 0;
-    }
-
-    .control-label {
-        font-size: 12px;
-    }
-
-    .control-row {
-        align-items: flex-start;
-        gap: 6px;
-    }
-
-    .chip-row {
-        flex-wrap: nowrap;
-        overflow: hidden;
-    }
-
-    #bgGradientDirectionPicker {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        overflow: visible;
-    }
-
-    .chip {
-        padding: 8px 12px;
-        font-size: 12px;
-    }
-
-    .slider {
-        min-width: 132px;
-    }
-
-    #section-style .control-group:has(.slider),
-    #section-element .control-group:has(.slider) {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 28px;
-        align-items: stretch;
-        column-gap: 12px;
-    }
-
-    #section-style .control-group:has(.slider) .control-row,
-    #section-element .control-group:has(.slider) .control-row {
-        grid-column: 1;
-        grid-row: 1;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: flex-start;
-        gap: 4px;
-    }
-
-    #section-style .control-group:has(.slider) .val-group,
-    #section-element .control-group:has(.slider) .val-group {
-        gap: 2px;
-    }
-
-    #section-style .control-group:has(.slider) .slider,
-    #section-element .control-group:has(.slider) .slider {
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        align-self: stretch;
-        justify-self: center;
-        min-width: 0;
-        width: 28px;
-        height: 100%;
-        min-height: 120px;
-        writing-mode: vertical-lr;
-        direction: rtl;
-        background: linear-gradient(
-            to top,
-            var(--color-text) 0%,
-            var(--color-text) var(--pct, 50%),
-            var(--color-border) var(--pct, 50%),
-            var(--color-border) 100%
-        );
-        touch-action: pan-y;
-    }
-
-    .control-val,
-    .control-unit,
-    .export-note {
-        font-size: 11px;
-    }
-
-    .section-label {
-        font-size: 9px;
-    }
-
-    .export-row {
-        width: 100%;
-    }
-
-    .export-btn {
-        height: 40px;
-        font-size: 12px;
-    }
-
-    .copy-btn {
-        width: 40px;
-        height: 40px;
-    }
-
-    .reset-btn {
-        width: 100%;
-        justify-content: center;
+        scroll-padding-left: 12px;
+        scrollbar-width: none;
     }
 
     .panel::-webkit-scrollbar {
         display: none;
+    }
+
+    .panel-wrapper {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+        width: max-content;
+        height: 100%;
+        padding: 0;
+    }
+
+    /* Each section is one snap card, reusing the desktop
+       control-set surface (soft white fill + inset ring). */
+    .panel .panel-section,
+    .panel .panel-section:first-child,
+    .panel .panel-section:last-child {
+        flex: 0 0 auto;
+        height: 100%;
+        margin: 0;
+        border: none;
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        gap: 16px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: inset 0 0 0 1px #ffffff8f, 0 1px 2px 1px #00000015;
+        scroll-snap-align: start;
+    }
+
+    /* Section label runs vertically along the card's left edge */
+    .panel .section-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+    }
+
+    /* Control sets flatten into columns inside the card,
+       separated by hairlines instead of nested cards. */
+    .panel .control-set {
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        gap: 10px;
+    }
+
+    .panel .control-set + .control-set {
+        border-left: 1px solid #00000012;
+        padding-left: 16px;
+    }
+
+    /* Background / Pattern sets hold several columns side by side */
+    .panel #backgroundControls,
+    .panel #patternControls {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 16px;
+    }
+
+    .panel .control-row--stacked {
+        gap: 8px;
+        width: max-content;
+    }
+
+    /* Color: label on top, hex + swatch beneath */
+    .panel #bgColorControl,
+    .panel #patternColorControl {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 8px;
+        width: max-content;
+    }
+
+    /* Chips wrap into a compact 2-column grid */
+    .panel .chip-row {
+        grid-template-columns: repeat(2, minmax(74px, 1fr));
+        width: 164px;
+    }
+
+    .panel .chip {
+        padding: 10px 0;
+    }
+
+    /* ── Vertical sliders ─────────────────────────────────── */
+
+    /* Subject sliders (.control-set > .slider) and backdrop
+       sliders (.control-row--stacked > .slider) become narrow
+       columns: label + value on top, vertical track below. */
+    .panel .control-set:has(> .slider),
+    .panel .control-row--stacked:has(> .slider) {
+        flex: 0 0 auto;
+        width: 82px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .panel .control-set:has(> .slider) > .control-row,
+    .panel .control-row--stacked:has(> .slider) > .control-row {
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+    }
+
+    .panel .control-set:has(> .slider) .control-label,
+    .panel .control-row--stacked:has(> .slider) .control-label {
+        min-height: 26px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        text-align: center;
+        white-space: normal;
+        line-height: 1.25;
+    }
+
+    .panel .slider {
+        writing-mode: vertical-rl;
+        direction: rtl;
+        flex: 1 1 auto;
+        align-self: center;
+        width: 28px;
+        min-width: 0;
+        height: auto;
+        min-height: 90px;
+        cursor: ns-resize;
+        touch-action: none;
+        background: linear-gradient(
+            to top,
+            #ff613d 0%,
+            #ff613d var(--pct, 50%),
+            rgba(0, 0, 0, 0.1) var(--pct, 50%),
+            rgba(0, 0, 0, 0.1) 100%
+        );
+        background-size: 4px 100%;
+        background-position: 50% 50%;
+        background-repeat: no-repeat;
+        box-shadow: none;
+    }
+
+    .panel .slider::-webkit-slider-thumb {
+        width: 18px;
+        height: 6px;
+        border-radius: 2px;
+        cursor: ns-resize;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .panel .slider::-moz-range-thumb {
+        width: 18px;
+        height: 6px;
+        border-radius: 2px;
+        border: none;
+        cursor: ns-resize;
+    }
+
+    /* ── Header card ──────────────────────────────────────── */
+
+    .panel #section-header {
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        min-width: 128px;
+        gap: 10px;
+        padding: 18px 14px 14px 14px;
+    }
+
+    .panel #section-header .logo {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .panel .reset-btn {
+        width: 100%;
+        margin-left: 0;
+        justify-content: center;
+        padding: 10px 12px;
+    }
+
+    /* ── Export card ──────────────────────────────────────── */
+
+    .panel #section-export {
+        display: grid;
+        grid-template-columns: auto 208px;
+        grid-template-rows: 1fr auto auto 1fr;
+        column-gap: 16px;
+        row-gap: 8px;
+    }
+
+    .panel #section-export .section-label {
+        grid-row: 1 / -1;
+        grid-column: 1;
+    }
+
+    .panel #section-export .export-row {
+        grid-row: 2;
+        grid-column: 2;
+        width: 100%;
+    }
+
+    .panel #section-export .helper-text {
+        grid-row: 3;
+        grid-column: 2;
     }
 }

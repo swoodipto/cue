@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "cue",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "4173"],
-      "port": 4173
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "python3 -m http.server $PORT"],
+      "autoPort": true
     }
   ]
 }
