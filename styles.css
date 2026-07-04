@@ -1343,10 +1343,15 @@ body:before {
         display: none;
     }
 
-    .panel .slider {
+    /* The stacked-row selector re-wins the width: 100% that the
+       desktop .control-row.control-row--stacked > .slider rule
+       sets at higher specificity than .panel .slider alone */
+    .panel .slider,
+    .panel .control-row--stacked > .slider {
         writing-mode: vertical-rl;
         direction: rtl;
-        flex: 1 1 auto;
+        /* Fixed width: never grow or shrink with the row */
+        flex: 0 0 auto;
         align-self: center;
         width: 28px;
         min-width: 0;
@@ -1354,17 +1359,27 @@ body:before {
         min-height: 90px;
         cursor: ns-resize;
         touch-action: none;
+        /* The 4px track is the element's padding box: transparent
+           side borders keep the 28px touch target, and the border
+           radius minus the border width leaves the track corners
+           rounded 2px × 2px (14 − 12 / 2 − 0), like desktop. No
+           styled track pseudo-element — engines position the thumb
+           inconsistently against those, and the symmetric borders
+           here keep track and thumb centered. */
+        box-sizing: border-box;
+        border: solid transparent;
+        border-width: 0 12px;
+        border-radius: 14px / 2px;
         background: linear-gradient(
             to top,
             #ff613d 0%,
             #ff613d var(--pct, 50%),
-            rgba(0, 0, 0, 0.1) var(--pct, 50%),
-            rgba(0, 0, 0, 0.1) 100%
+            rgba(0, 0, 0, 0.06) var(--pct, 50%),
+            rgba(0, 0, 0, 0.06) 100%
         );
-        background-size: 4px 100%;
-        background-position: 50% 50%;
-        background-repeat: no-repeat;
-        box-shadow: none;
+        background-clip: padding-box;
+        box-shadow: 1px 0 2px 0 #0000004d inset,
+                    -1px 0 1px 0 #ffffffd1 inset;
     }
 
     .panel .slider::-webkit-slider-thumb {
@@ -1372,7 +1387,7 @@ body:before {
         height: 6px;
         border-radius: 2px;
         cursor: ns-resize;
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);;
     }
 
     .panel .slider::-moz-range-thumb {
