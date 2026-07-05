@@ -301,11 +301,16 @@ svg {
     animation-fill-mode: both;
 }
 
-.canvas-actions-label {
+.canvas-actions-label,
+.canvas-actions-label--handy {
     font-size: 12px;
     color: var(--color-text-muted);
     line-height: 1.2;
     white-space: nowrap;
+}
+
+.canvas-actions-label--handy {
+    display: none;
 }
 
 .cortshuts {
@@ -1015,6 +1020,23 @@ body:before {
     font-family: var(--font-mono);
 }
 
+#canvasBrowseBtn {
+    width: auto;
+    height: 36px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 6px 28px 0 6px;
+    font-size: 12px;
+    gap: 5px;
+}
+
+#canvasBrowseBtn svg {
+    transform: rotate(180deg);
+    filter: drop-shadow(0 -1px #ffffffee);
+    height:14px;
+    width: auto;
+}
+
 /* ── Utility ────────────────────────────────────────────────── */
 
 .hidden {
@@ -1133,12 +1155,30 @@ body:before {
         width: fit-content;
         margin: 0 auto;
         z-index: 2;
-        padding: 8px;
+        padding: 8px 8px 8px 16px;
         border-radius: 14px;
     }
 
     .canvas-actions-label {
         display: none;
+    }
+
+    .canvas-actions-label--handy {
+        display: block;
+        margin-top: -2px;
+    }
+
+    #canvasBrowseBtn {
+        height: 42px;
+        padding: 8px 40px 0 8px;
+        font-size: 13px;
+    }
+
+    #canvasBrowseBtn svg {
+        transform: rotate(180deg);
+        filter: drop-shadow(0 -1px #ffffffee);
+        height:15px;
+        width: auto;
     }
 
     /* ── Panel → horizontal card rail ─────────────────────── */
