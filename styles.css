@@ -754,20 +754,19 @@ body:before {
 
 .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 5px;
+    width: 16px;
     height: 16px;
-    border-radius: 2px;
+    border-radius: 4px;
     background: #ffffff;
     cursor: ew-resize;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
     background: #ffffff;
-    border: 2px solid #1a1a1a;
     cursor: ew-resize;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
@@ -1441,19 +1440,13 @@ body:before {
                     -1px 0 1px 0 #ffffffd1 inset;
     }
 
+    /* Thumb inherits the desktop 16×16 rounded square; only the
+       drag cursor differs for the vertical orientation */
     .panel .slider::-webkit-slider-thumb {
-        width: 18px;
-        height: 6px;
-        border-radius: 2px;
         cursor: ns-resize;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);;
     }
 
     .panel .slider::-moz-range-thumb {
-        width: 18px;
-        height: 6px;
-        border-radius: 2px;
-        border: none;
         cursor: ns-resize;
     }
 
