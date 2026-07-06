@@ -2190,6 +2190,10 @@ function handleCopyToClipboardRequest() {
 
 function initClipboard() {
   document.addEventListener("paste", (e) => {
+    // Let text pastes reach inputs; images are still claimed globally.
+    const hasImage = Array.from(e.clipboardData?.items || [])
+      .some((it) => it.type.startsWith("image/"));
+    if (!hasImage && isEditableTarget(e.target)) return;
     if (handleClipboardData(e.clipboardData)) {
       e.preventDefault();
     }
