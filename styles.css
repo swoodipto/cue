@@ -1094,9 +1094,14 @@ body:before {
 }
 
 @media (max-width: 768px) {
+    .toast-container {
+        align-items: flex-start;
+        padding-top: 20px;
+    }
+
     .toast {
-        width: 100%;
-        text-align: center;
+        width: auto;
+        transform: scale(1.15);
     }
 }
 
