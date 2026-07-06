@@ -6,6 +6,41 @@ import minimalPatch from "./patches/minimal-patch.js";
    State · Canvas · Upload · Clipboard · Controls · Export · Session
    ============================================================ */
 
+/* ============================================================
+   TABLE OF CONTENTS
+   (section banners appear in this order; one file by design)
+   ------------------------------------------------------------
+    1. State                — app state, reduced-motion check,
+                              DEFAULT_SETTINGS, DEMO_IMAGES,
+                              overlay + blur constants
+    2. Canvas size presets  — CANVAS_PRESETS
+    3. Audio feedback       — sound patch, iOS unlock flow,
+                              playSound / playSliderTick
+    4. Shadow               — computeShadow + mask/layer compositing
+    5. Pattern helpers      — color math, blur surfaces,
+                              noise / dots / grid painters,
+                              gradient + blurred backgrounds
+    6. DOM refs             — $, the els map, canvas ctx
+    7. Canvas render        — SCALE, getCanvasLayout, render();
+                              also hosts the overlay placement
+                              engine (getOverlay…, paintOverlay),
+                              overlay UI sync, and tracedRoundRect
+    8. Image loading        — image/logo loading + persistence
+    9. URL loading          — clipboard-triggered URL loads
+   10. Show / hide preview  — reveal, paste animation, resetCanvas
+   11. Upload zone          — file inputs, drag & drop wiring
+   12. Clipboard paste      — paste + copy-shortcut handling
+   13. Slider helpers       — refreshSlider, connectSlider
+   14. Controls             — initControls wiring; also hosts
+                              applySettingsToUI and syncChipPicker
+   15. Export               — download + copy buttons
+   16. Toast                — showToast
+   17. Session persistence  — SESSION_KEY save/restore + the
+                              pattern:"blur" → bgType:"blur" migration
+   18. Resize               — debounced re-render
+   19. Init                 — init() + DOMContentLoaded
+   ============================================================ */
+
 "use strict";
 
 /* ── State ──────────────────────────────────────────────────── */
@@ -1980,7 +2015,8 @@ function handleClipboardData(clipboardData) {
   return false;
 }
 
-/* ── URL loading (clipboard-triggered, no dedicated input field) */
+/* ── URL loading ────────────────────────────────────────────── */
+/* Clipboard-triggered — there is no dedicated URL input field.  */
 
 async function loadFromURL(url) {
   url = url.trim();
