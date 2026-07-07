@@ -135,6 +135,38 @@ then the single `service-worker.js` change: `CACHE_NAME` `"cue-v21"` →
 - **Rename proposal only:** `.cortshuts` → `.shortcuts` (used in HTML + CSS;
   not performed per decision #2).
 
+### Phase 5 — performance & storage follow-up (2026-07-08, maintainer-approved)
+
+Executed after the refactor with the maintainer's per-item sign-off; these
+*intentionally* change internals (not rendered output):
+
+- **A1+D1 — session storage split.** `saveSession()` now writes settings
+  only (~0.6 KB per control tick instead of re-serializing the full-res
+  image, previously megabytes per slider tick). Image and logo persist as
+  PNG Blobs in IndexedDB (`cue-session`/`blobs`), removing the ~5 MB
+  localStorage quota that silently dropped large images and the +33%
+  base64 inflation. Old-format `cue_v5` sessions restore and migrate
+  automatically. Demo/reset clears the stored blobs. `toStorageURL()` is
+  now unused but preserved (same convention as `els.blurControl`).
+- **A3 — blur drag reuse.** During continuous padding/ratio changes with a
+  blur background, the last exact blurred surface is reused (stretched)
+  instead of re-running the full blur every input tick; an exact rebuild
+  re-renders ~0.24 s after input settles. Measured: 15 drag ticks in 14 ms
+  total (previously a full blur per tick). Settled frames converge to
+  byte-identical baseline hashes (verified against `S08_blur_none_free`).
+- **A4 — async export.** Download uses the existing `toBlob` path + object
+  URL instead of synchronous `toDataURL`; output verified byte-identical
+  (436,556-byte PNG compared byte-for-byte). Adds one new failure toast
+  ("Couldn't prepare the PNG.").
+- Verified: legacy-format migration (localStorage rewritten settings-only,
+  blobs land in IndexedDB, render hash = S01 baseline), new-format restore
+  from IndexedDB, full 13-state export matrix parity, reset clears blobs,
+  export toast, clean console. `CACHE_NAME` bumped to `"cue-v23"`.
+- Declined by maintainer / left as-is: A5 (micro cleanups), B1–B6 quirk
+  fixes (B6's double `font-weight` fixed manually by the maintainer),
+  C (dead-code cleanup), D2 (store original file bytes). A2 (shadow-layer
+  cache) pending maintainer answer.
+
 ### Deviations from the brief's letter (none from its intent)
 
 - §13.1 suggested downloading PNGs and running pixelmatch/ImageMagick; the
