@@ -35,8 +35,9 @@ import minimalPatch from "./patches/minimal-patch.js";
                               applySettingsToUI and syncChipPicker
    15. Export               — download + copy buttons
    16. Toast                — showToast
-   17. Session persistence  — SESSION_KEY save/restore + the
-                              pattern:"blur" → bgType:"blur" migration
+   17. Session persistence  — settings in localStorage (SESSION_KEY),
+                              image/logo Blobs in IndexedDB, legacy
+                              format + pattern:"blur" migrations
    18. Resize               — debounced re-render
    19. Init                 — init() + DOMContentLoaded
    ============================================================ */
@@ -47,7 +48,7 @@ import minimalPatch from "./patches/minimal-patch.js";
 
 const state = {
   image: null,        // HTMLImageElement currently displayed
-  imageDataURL: null, // compressed data URL persisted to localStorage
+  imageDataURL: null, // legacy field — image bytes now persist to IndexedDB
   logoImage: null,
   logoDataURL: null,
   isDemo: true,
@@ -823,6 +824,15 @@ function createBlurredBackgroundSurface(img, cW, cH, blurPx) {
   };
 }
 
+/* During a continuous padding/ratio drag the canvas size changes every
+   input tick, and each tick would otherwise re-run the full (expensive)
+   software blur. Inside this window we reuse the last exact surface
+   stretched to the new size, then rebuild the exact surface once input
+   has settled. Final frames are always exact. */
+const BLUR_TRANSIENT_WINDOW_MS = 200;
+let blurSurfaceLastMissAt = 0;
+let blurSurfaceRebuildTimer = null;
+
 function getBlurredBackgroundSurface(img, cW, cH, blurPx) {
   const cached = state.blurCache;
   if (
@@ -836,6 +846,30 @@ function getBlurredBackgroundSurface(img, cW, cH, blurPx) {
     return cached;
   }
 
+  // Same image + blur at a new size, arriving faster than the transient
+  // window → stretch the previous exact surface and defer the rebuild.
+  const now = performance.now();
+  const reusable =
+    cached &&
+    cached.image === img &&
+    cached.blur === blurPx &&
+    cached.method === state.canvasBlurMode;
+  if (reusable && now - blurSurfaceLastMissAt < BLUR_TRANSIENT_WINDOW_MS) {
+    blurSurfaceLastMissAt = now;
+    clearTimeout(blurSurfaceRebuildTimer);
+    blurSurfaceRebuildTimer = setTimeout(() => {
+      if (state.image) render();
+    }, BLUR_TRANSIENT_WINDOW_MS + 40);
+    return {
+      canvas: cached.canvas,
+      pad: cached.pad,
+      width: cached.width,
+      height: cached.height,
+      transient: true,
+    };
+  }
+
+  blurSurfaceLastMissAt = now;
   const next = createBlurredBackgroundSurface(img, cW, cH, blurPx);
   state.blurCache = {
     image: img,
@@ -950,6 +984,16 @@ function paintGrid(ctx, w, h, lineColor, scale = 1, blendMode = "overlay", opaci
  */
 function paintBlurredBackground(ctx, img, cW, cH, blurPx) {
   const surface = getBlurredBackgroundSurface(img, cW, cH, blurPx);
+  if (surface.transient) {
+    // Mid-drag frame: map the previous exact surface's visible region onto
+    // the new canvas size. The deferred rebuild re-renders exactly.
+    ctx.drawImage(
+      surface.canvas,
+      surface.pad, surface.pad, surface.width, surface.height,
+      0, 0, cW, cH
+    );
+    return;
+  }
   ctx.drawImage(surface.canvas, surface.pad, surface.pad, cW, cH, 0, 0, cW, cH);
 }
 
@@ -1871,7 +1915,14 @@ async function setImage(src, options = {}) {
       syncOverlaySizeBounds();
     }
     render();
-    state.imageDataURL = persist ? toStorageURL(img) : null;
+    // Image bytes persist to IndexedDB; "keep" means the image was just
+    // restored from there, so there is nothing to write or delete.
+    state.imageDataURL = null;
+    if (persist === true) {
+      void persistSessionImage(img);
+    } else if (persist === false) {
+      void idbDelete(IDB_KEY_IMAGE);
+    }
     saveSession();
     if (soundName) {
       playSound(soundName, 0.9);
@@ -1915,6 +1966,11 @@ async function setLogoImage(src, persist = true, soundName = null, options = {})
     const img = await loadImgElement(src);
     state.logoImage = img;
     state.logoDataURL = persist ? src : null;
+    if (persist === true) {
+      void persistSessionLogo(src);
+    } else if (persist === false) {
+      void idbDelete(IDB_KEY_LOGO);
+    }
     if (autoFit || state.pendingLogoAutoFit) {
       state.overlaySizeAutoFit = state.settings.overlayType === "logo";
       autoFitActiveOverlaySize();
@@ -2034,8 +2090,9 @@ async function loadFromURL(url) {
     updateImageLabel(state.imageLabel);
     showPreview();
     render();
-    // Still compress for storage, but the display uses the original
-    state.imageDataURL = toStorageURL(img);
+    // Persist a PNG snapshot to IndexedDB; the display uses the original
+    state.imageDataURL = null;
+    void persistSessionImage(img);
     saveSession();
     playSound(UI_SOUNDS.import, 0.9);
   } catch {
@@ -2080,6 +2137,8 @@ async function resetCanvas() {
   state.imageDataURL = null;
   state.logoImage    = null;
   state.logoDataURL  = null;
+  void idbDelete(IDB_KEY_IMAGE);
+  void idbDelete(IDB_KEY_LOGO);
   invalidateBlurCache();
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   await loadDemoImage();
@@ -2662,12 +2721,22 @@ function syncChipPicker(container, dataKey, value) {
 function initExport() {
   els.exportBtn.addEventListener("click", () => {
     if (!state.image) return;
-    const link    = document.createElement("a");
-    link.download = "cue-export.png";
-    link.href     = els.canvas.toDataURL("image/png");
-    link.click();
-    playSound(UI_SOUNDS.download, 0.92);
-    showToast("Downloaded ✓");
+    // toBlob encodes off the main thread (unlike toDataURL), so large
+    // canvases no longer freeze the UI while the PNG is prepared.
+    createCanvasPngBlobPromise()
+      .then((blob) => {
+        const link    = document.createElement("a");
+        link.download = "cue-export.png";
+        link.href     = URL.createObjectURL(blob);
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        playSound(UI_SOUNDS.download, 0.92);
+        showToast("Downloaded ✓");
+      })
+      .catch(() => {
+        playSound(UI_SOUNDS.error, 0.9);
+        showToast("Couldn't prepare the PNG.");
+      });
   });
 
   els.copyBtn.addEventListener("click", () => {
@@ -2690,12 +2759,89 @@ function showToast(msg) {
 
 const SESSION_KEY = "cue_v5";
 
+/* Settings persist to localStorage (tiny, written on every control
+   change). Image and logo bytes persist as Blobs in IndexedDB, which
+   avoids the ~5MB localStorage quota that silently dropped large images,
+   skips base64 inflation, and keeps per-tick saves cheap. Sessions saved
+   by the old all-in-localStorage format still restore (and migrate) via
+   restoreSession. All persistence is best-effort: failures degrade to a
+   non-persisted session, never a broken app. */
+
+const IDB_NAME = "cue-session";
+const IDB_STORE = "blobs";
+const IDB_KEY_IMAGE = "image";
+const IDB_KEY_LOGO = "logo";
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbRequest(mode, run) {
+  try {
+    const db = await idbOpen();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, mode);
+      const req = run(tx.objectStore(IDB_STORE));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }).finally(() => db.close());
+  } catch {
+    return null; // persistence is best-effort
+  }
+}
+
+function idbGet(key) {
+  return idbRequest("readonly", (store) => store.get(key));
+}
+
+function idbPut(key, value) {
+  return idbRequest("readwrite", (store) => store.put(value, key));
+}
+
+function idbDelete(key) {
+  return idbRequest("readwrite", (store) => store.delete(key));
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("PNG encode failed"));
+    }, "image/png");
+  });
+}
+
+/** Snapshot the image as a PNG Blob into IndexedDB (async, off the save path). */
+async function persistSessionImage(img) {
+  try {
+    const off = document.createElement("canvas");
+    off.width  = img.naturalWidth;
+    off.height = img.naturalHeight;
+    off.getContext("2d").drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+    await idbPut(IDB_KEY_IMAGE, await canvasToPngBlob(off));
+  } catch { /* best-effort */ }
+}
+
+/** Store the logo's bytes (a data: URL from the file picker) in IndexedDB. */
+async function persistSessionLogo(src) {
+  try {
+    const blob = await (await fetch(src)).blob();
+    await idbPut(IDB_KEY_LOGO, blob);
+  } catch { /* best-effort */ }
+}
+
 function saveSession() {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      settings:     state.settings,
-      imageDataURL: state.isDemo ? null : state.imageDataURL,
-      logoDataURL:  state.logoDataURL,
+      settings: state.settings,
     }));
   } catch { /* quota exceeded — fail silently */ }
 }
@@ -2713,6 +2859,11 @@ async function restoreSession() {
       }
       applySettings(saved.settings);
     }
+
+    // Legacy format: image/logo data URLs lived inside the same
+    // localStorage blob. Restore them and let setImage/setLogoImage
+    // re-persist into IndexedDB; their saveSession() calls rewrite
+    // localStorage in the new settings-only shape.
     if (saved.imageDataURL) {
       await setImage(saved.imageDataURL, {
         persist: true,
@@ -2726,8 +2877,37 @@ async function restoreSession() {
     }
     if (saved.logoDataURL) {
       await setLogoImage(saved.logoDataURL);
+      return false;
     }
-    return false;
+
+    // Current format: bytes live in IndexedDB.
+    const [imageBlob, logoBlob] = await Promise.all([
+      idbGet(IDB_KEY_IMAGE),
+      idbGet(IDB_KEY_LOGO),
+    ]);
+    let restored = false;
+    if (imageBlob) {
+      const url = URL.createObjectURL(imageBlob);
+      try {
+        await setImage(url, {
+          persist: "keep",
+          label: "my-image.png",
+          isDemo: false,
+        });
+        restored = true;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+    if (logoBlob) {
+      const url = URL.createObjectURL(logoBlob);
+      try {
+        await setLogoImage(url, "keep");
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+    return restored;
   } catch {
     localStorage.removeItem(SESSION_KEY); // corrupted — start fresh
     return false;
