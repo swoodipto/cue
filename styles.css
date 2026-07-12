@@ -11,6 +11,9 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    /* iOS decides double-tap zoom from the tapped element's own
+       touch-action, not its ancestors', so every element opts out */
+    touch-action: manipulation;
 }
 
 /* ── Tokens ─────────────────────────────────────────────────── */

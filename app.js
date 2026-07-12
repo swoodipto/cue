@@ -2711,11 +2711,31 @@ window.addEventListener("resize", () => {
 
 // iOS Safari ignores user-scalable=no in the viewport meta, so pinch
 // zoom has to be cancelled via WebKit's proprietary gesture events
-// (no-ops in other browsers). Double-tap zoom is handled by the
-// touch-action rule on html/body in CSS.
+// (no-ops in other browsers).
 ["gesturestart", "gesturechange"].forEach((type) => {
   document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 });
+
+// touch-action: manipulation (CSS reset) stops double-tap zoom on
+// controls, but iOS still zooms fast double-taps on non-interactive
+// areas, so the second tap of a fast pair is cancelled here. Taps on
+// controls are left alone — preventDefault would swallow their click.
+const DOUBLE_TAP_INTERVAL_MS = 350;
+const DOUBLE_TAP_EXEMPT =
+  "button, a, input, select, textarea, label, [role='button']";
+let lastTouchEndAt = 0;
+
+document.addEventListener(
+  "touchend",
+  (e) => {
+    const isFastSecondTap = e.timeStamp - lastTouchEndAt < DOUBLE_TAP_INTERVAL_MS;
+    lastTouchEndAt = e.timeStamp;
+    if (!isFastSecondTap || !e.cancelable) return;
+    if (e.target instanceof Element && e.target.closest(DOUBLE_TAP_EXEMPT)) return;
+    e.preventDefault();
+  },
+  { passive: false }
+);
 
 /* ── Init ───────────────────────────────────────────────────── */
 
