@@ -2707,6 +2707,16 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(() => { if (state.image) render(); }, 120);
 });
 
+/* ── Viewport zoom lock ─────────────────────────────────────── */
+
+// iOS Safari ignores user-scalable=no in the viewport meta, so pinch
+// zoom has to be cancelled via WebKit's proprietary gesture events
+// (no-ops in other browsers). Double-tap zoom is handled by the
+// touch-action rule on html/body in CSS.
+["gesturestart", "gesturechange"].forEach((type) => {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+});
+
 /* ── Init ───────────────────────────────────────────────────── */
 
 async function init() {

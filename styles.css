@@ -48,6 +48,9 @@
 html,
 body {
     height: 100%;
+    /* Blocks double-tap-to-zoom on iOS, which ignores the viewport
+       meta's user-scalable=no; pan-x pan-y keeps scrolling working */
+    touch-action: pan-x pan-y;
     font-family: var(--font);
     background: var(--color-panel);
     color: var(--color-text);
