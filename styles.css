@@ -1454,10 +1454,16 @@ body:before {
        drag cursor differs for the vertical orientation */
     .panel .slider::-webkit-slider-thumb {
         cursor: ns-resize;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
     }
 
     .panel .slider::-moz-range-thumb {
         cursor: ns-resize;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
     }
 
     /* ── Header card ──────────────────────────────────────── */
