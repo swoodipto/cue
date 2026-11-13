@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS = {
   overlayEdgeDistance: 0,  // px of extra inset from the canvas edge
   overlayOpacity: 70,     // 10–100
   overlayPosition: "bottom-right", // corners | edges
+  watermarkEnabled: true,
   soundEnabled: !prefersReducedMotion(),
 };
 
@@ -1004,6 +1005,7 @@ const els = {
   overlayOpacityControl: $("overlayOpacityControl"),
   overlayOpacitySlider: $("overlayOpacitySlider"),
   overlayOpacityVal: $("overlayOpacityVal"),
+  watermarkPicker: $("watermarkPicker"),
   soundPicker: $("soundPicker"),
   soundUnlockControl: $("soundUnlockControl"),
   soundUnlockBtn: $("soundUnlockBtn"),
@@ -1070,7 +1072,116 @@ function getCanvasLayout(img, settings = state.settings) {
     iy = Math.round((cH - dH) / 2);
   }
 
-  return { cW, cH, dW, dH, ix, iy, imgW, imgH, aspect, pad };
+  let watermark = null;
+  if (settings.watermarkEnabled) {
+    // Keep even tiny Wrap images wide enough for the credit and its insets.
+    if (!preset) {
+      cW = Math.max(cW, 176);
+      ix = Math.round((cW - dW) / 2);
+    }
+    const unit = Math.max(1, Math.min(cW, cH) / 560);
+    watermark = { fontSize: 12 * unit, markSize: 22 * unit, gap: 6 * unit, inset: 20 * unit };
+    const footerHeight = Math.ceil(watermark.markSize + watermark.inset * 2);
+
+    if (!preset) {
+      // Preserve the original image resolution; grow only the bottom margin.
+      cH += Math.max(0, footerHeight - pad);
+    } else if (iy + dH > cH - footerHeight) {
+      // Fixed ratios retain their dimensions and fit the subject above the credit.
+      const fit = Math.min((cW - pad * 2) / imgW, (cH - pad - footerHeight) / imgH);
+      dW = Math.max(1, Math.floor(imgW * fit));
+      dH = Math.max(1, Math.floor(imgH * fit));
+      ix = Math.round((cW - dW) / 2);
+      iy = pad + Math.floor((cH - pad - footerHeight - dH) / 2);
+    }
+  }
+
+  return { cW, cH, dW, dH, ix, iy, imgW, imgH, aspect, pad, watermark };
+}
+
+function paintWatermark(ctx, { cW, cH, watermark }) {
+  if (!watermark) return;
+  const { fontSize, markSize, gap, inset } = watermark;
+  const fontFamily = OVERLAY_FONT_STACKS["sans-serif"];
+  const text = "made with";
+  const mark = "ꔛ";
+  const wordmark = "cue";
+  const wordmarkSize = markSize * 20 / 32;
+  const brandGap = markSize * 4 / 32;
+  const unit = fontSize / 12;
+  ctx.save();
+  ctx.font = `500 ${fontSize}px ${fontFamily}`;
+  const textMetrics = ctx.measureText(text);
+  ctx.font = `500 ${markSize}px ${fontFamily}`;
+  const markMetrics = ctx.measureText(mark);
+  ctx.font = `500 ${wordmarkSize}px ${fontFamily}`;
+  const wordmarkMetrics = ctx.measureText(wordmark);
+  const width = textMetrics.width + gap + markMetrics.width + brandGap + wordmarkMetrics.width;
+  const x = (cW - width) / 2;
+  const centerY = cH - inset - markSize / 2;
+
+  // Sample the finished backdrop so the subtle credit also works on blur and patterns.
+  let color = adaptivePatternColor(getBackgroundReferenceColor(state.settings));
+  try {
+    const pixels = ctx.getImageData(Math.floor(x * SCALE), Math.floor(centerY * SCALE), Math.ceil(width * SCALE), 1).data;
+    let luminance = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      luminance += 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+    }
+    color = luminance / (pixels.length / 4) > 128 ? "#000000" : "#ffffff";
+  } catch { /* Use the background reference if pixel access is unavailable. */ }
+  // Compose the lettering and emboss together, then apply opacity once.
+  const layer = document.createElement("canvas");
+  layer.width = Math.ceil((width + inset * 2) * SCALE);
+  layer.height = Math.ceil((markSize + inset * 2) * SCALE);
+  const layerCtx = layer.getContext("2d");
+  if (!layerCtx) {
+    ctx.restore();
+    return;
+  }
+  layerCtx.scale(SCALE, SCALE);
+  layerCtx.translate(inset - x, inset + markSize / 2 - centerY);
+  layerCtx.fillStyle = color;
+  layerCtx.textAlign = "left";
+  layerCtx.textBaseline = "alphabetic";
+  const runs = [
+    { text, size: fontSize, metrics: textMetrics, x },
+    { text: mark, size: markSize, metrics: markMetrics, x: x + textMetrics.width + gap },
+    {
+      text: wordmark,
+      size: wordmarkSize,
+      metrics: wordmarkMetrics,
+      x: x + textMetrics.width + gap + markMetrics.width + brandGap,
+    },
+  ];
+  const drawLettering = (offsetX = 0) => {
+    runs.forEach((run) => {
+      layerCtx.font = `500 ${run.size}px ${fontFamily}`;
+      const y = centerY + (run.metrics.actualBoundingBoxAscent - run.metrics.actualBoundingBoxDescent) / 2;
+      layerCtx.fillText(run.text, run.x + offsetX, y);
+    });
+  };
+
+  // Match the app logo's lower highlight and upper shadow. Keep the shadow
+  // sources off-canvas so the lettering itself is painted once.
+  const shadowSourceOffset = cW + width;
+  layerCtx.shadowOffsetX = -shadowSourceOffset * SCALE;
+  layerCtx.shadowColor = "#ffffffc2";
+  layerCtx.shadowOffsetY = 0.9 * unit * SCALE;
+  layerCtx.shadowBlur = unit * SCALE;
+  drawLettering(shadowSourceOffset);
+  layerCtx.shadowColor = "#333333f5";
+  layerCtx.shadowOffsetY = -0.5 * unit * SCALE;
+  layerCtx.shadowBlur = 0.6 * unit * SCALE;
+  drawLettering(shadowSourceOffset);
+  layerCtx.shadowColor = "transparent";
+  layerCtx.shadowOffsetX = 0;
+  layerCtx.shadowOffsetY = 0;
+  layerCtx.shadowBlur = 0;
+  drawLettering();
+  ctx.globalAlpha = 0.5;
+  ctx.drawImage(layer, x - inset, centerY - markSize / 2 - inset, layer.width / SCALE, layer.height / SCALE);
+  ctx.restore();
 }
 
 function render() {
@@ -1191,6 +1302,9 @@ function render() {
     );
   }
   ctx.drawImage(imgOff, ix, iy, dW, dH);
+
+  // 5 — Optional Cue credit in its own bottom margin (included in PNG/copy).
+  paintWatermark(ctx, layout);
 
   ctx.restore();
 }
@@ -1850,6 +1964,7 @@ async function setImage(src, options = {}) {
 async function loadDemoImage(demo = pickDemoImage()) {
   applySettings({
     ...demo.settings,
+    watermarkEnabled: state.settings.watermarkEnabled,
     soundEnabled: state.settings.soundEnabled,
   });
   await setImage(demo.src, {
@@ -2501,6 +2616,19 @@ function initControls() {
     saveSession();
   });
 
+  els.watermarkPicker.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-watermark]");
+    if (!chip) return;
+    const enabled = chip.dataset.watermark === "show";
+    if (enabled === state.settings.watermarkEnabled) return;
+    state.settings.watermarkEnabled = enabled;
+    updateWatermarkUI();
+    syncOverlaySizeBounds();
+    render();
+    saveSession();
+    playSound(UI_SOUNDS.chip, 0.72);
+  });
+
   els.soundPicker.addEventListener("click", (e) => {
     const chip = e.target.closest(".chip[data-sound]");
     if (!chip) return;
@@ -2550,6 +2678,7 @@ function applySettingsToUI() {
   syncChipPicker(els.patternPicker,  "pattern", pattern);
   syncChipPicker(els.bgGradientDirectionPicker, "gradientDirection", bgGradientDirection);
   syncChipPicker(els.soundPicker, "sound", soundEnabled ? "on" : "off");
+  updateWatermarkUI();
 
   // Show controls based on selections
   updateBackgroundUI();
@@ -2607,6 +2736,13 @@ function applySettingsToUI() {
 
 function toDataAttrKey(dataKey) {
   return dataKey.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+}
+
+function updateWatermarkUI() {
+  syncChipPicker(els.watermarkPicker, "watermark", state.settings.watermarkEnabled ? "show" : "hide");
+  els.watermarkPicker.querySelectorAll(".chip").forEach((chip) => {
+    chip.setAttribute("aria-pressed", String(chip.classList.contains("active")));
+  });
 }
 
 function toDatasetKey(dataKey) {

@@ -557,6 +557,13 @@
                 <!-- ── Export (hidden until image loaded) ─────────── -->
                 <section class="panel-section hidden" id="section-export">
                     <p class="section-label">Export</p>
+                    <div class="watermark-control">
+                        <span class="control-label" id="watermarkLabel">Watermark</span>
+                        <div class="chip-row" id="watermarkPicker" role="group" aria-labelledby="watermarkLabel">
+                            <button type="button" class="chip active" data-watermark="show" aria-pressed="true">Show</button>
+                            <button type="button" class="chip" data-watermark="hide" aria-pressed="false">Hide</button>
+                        </div>
+                    </div>
                     <div class="export-row">
                         <div class="btn-wrapper">
                             <button class="export-btn" id="exportBtn">
@@ -586,7 +593,7 @@
                         </div>
 
                     </div>
-                    <p class="helper-text">2× Quality · No Watermark</p>
+                    <p class="helper-text">2× Quality · PNG</p>
                 </section>
 
                 <section class="panel-section hidden" id="section-feedback">
